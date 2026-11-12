@@ -2,7 +2,7 @@
 
 面向 AstrBot 的 QQ 群管理插件，支持 AI 入群审核、广告识别、图片文字与二维码识别，以及违规处理后的管理员提醒。
 
-基于 [zhaisir 的 QQ群智能守护者](https://github.com/zcj-ui/astrbot_plugin_group_guardian) v2.8.11 维护，保留原作者署名与 MIT 许可证。本项目为独立维护版本，原始基线提交为 `569f6bb1a0dd0bc77f2085ba8be9bdac72be3de5`。
+基于 [zhaisir 的 QQ群智能守护者](https://github.com/zcj-ui/astrbot_plugin_group_guardian) v2.8.11，并整合 Zhalslar 的 QQAdmin v3.4.2。保留两者的作者署名和许可证，合并版本按 GPL-3.0 发布，原 MIT 部分的授权见 `LICENSES/GroupGuardian-MIT.txt`。本项目为独立维护版本，Group Guardian 的原始基线提交为 `569f6bb1a0dd0bc77f2085ba8be9bdac72be3de5`。
 
 ## 安装
 
@@ -24,6 +24,9 @@ https://github.com/Astraea35/astrbot_plugin_group_chat_management
 - 可要求 AI 确认后才处罚；该选项开启时，模型失败不会直接触发规则处罚。
 - 处理后私信指定管理员，包含发送者、原因、摘要及实际处理结果；私聊失败可在群内 @管理员。是否踢人由管理员决定。
 - 保留原插件的管理面板、词库、群范围、管理员豁免和手动管理工具。
+- 整合 QQAdmin 的禁言、全禁、改名、头衔、踢人、拉黑、管理员、精华、撤回、公告、群文件、投票禁言、宵禁、欢迎与退群通知。原指令和秒数参数用法保留，例如 `/禁言 60 @用户`。
+- 同一插件提供分群权限与默认模板管理页面。`/批准`、`/驳回` 支持引用申请通知，完整保留带冒号的 OneBot 请求标识。
+- 已接管的 AI 入群申请不会再次交给传统审核；分群黑名单也纳入 AI 准入检查。LLM 管理工具始终检查权限，模型传入 `need_auth=false` 不能绕过鉴权。
 
 ## 配置
 
@@ -42,11 +45,15 @@ https://github.com/Astraea35/astrbot_plugin_group_chat_management
 
 请同时配置目标群范围、审核开关、管理员豁免和处罚时长。自行设置入群关键词及 AI 标准，结合群聊语境区别实际引流与正常交流、引用举报、玩笑。
 
+`management` 保存基础群管默认模板与权限；“群管理与权限设置”页面编辑各群配置。AI 审核参数仍由主审核面板管理，已开启 AI 审核的群优先使用主审核标准。传统入群审核默认关闭，尝试次数自动拉黑默认关闭，人工批准默认要求管理员权限。
+
+迁移原 QQAdmin 时，须先停用旧插件，将原配置迁入 `management`，并将其数据复制到本插件数据目录的 `management/` 下。确认权限、分群设置、黑名单、文件与宵禁数据后再卸载旧插件。请勿同时启用两份群管。
+
 ## 开发与测试
 
 ```shell
 python -m pip install pytest pytest-asyncio pytest-subtests pillow qrcode numpy opencv-python-headless
-python -m pytest tests/test_membership_api_result.py tests/test_provider_streaming.py tests/test_group_review_policy.py tests/test_group_policy_revision.py -q
+python -m pytest tests/test_membership_api_result.py tests/test_provider_streaming.py tests/test_group_review_policy.py tests/test_group_policy_revision.py tests/test_management_merge.py -q
 ```
 
 测试使用虚构账号、群号和合成样例，不连接实际 QQ 账号，也不会执行真实处罚。`lexicon.db` 是与原项目一致的静态词库，不含实例审核记录。
@@ -55,4 +62,4 @@ python -m pytest tests/test_membership_api_result.py tests/test_provider_streami
 
 ## 许可证
 
-MIT。原作者：zhaisir；本维护版：Astraea35。详见 [LICENSE](LICENSE)。
+GPL-3.0。原作者：zhaisir、Zhalslar；本维护版：Astraea35。详见 [LICENSE](LICENSE)、[NOTICE](NOTICE) 和 [原 MIT 授权](LICENSES/GroupGuardian-MIT.txt)。

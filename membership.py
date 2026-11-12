@@ -583,7 +583,14 @@ class MembershipMixin:
         rule = self._resolve_join_rule(group_id)
         if not rule.get("enabled", True):
             return False
-        if user_id and user_id in self._user_black_set:
+        management_db = getattr(self, "_admin_db", None)
+        management_blocked = (
+            management_db is not None
+            and user_id in {
+                str(value) for value in await management_db.get(group_id, "block_ids", [])
+            }
+        )
+        if user_id and (user_id in self._user_black_set or management_blocked):
             return await self._complete_group_request(
                 event,
                 flag,

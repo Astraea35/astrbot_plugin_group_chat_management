@@ -1,955 +1,1552 @@
 {
-    "disclaimer_agreed": {
-        "description": "我已阅读并同意免责声明",
+  "disclaimer_agreed": {
+    "description": "我已阅读并同意免责声明",
+    "type": "bool",
+    "default": false,
+    "hint": "使用本插件前必须阅读并同意免责声明，请点击阅读后勾选此项。免责声明地址：https://mianze.0n.pub"
+  },
+  "webui_dark_mode": {
+    "description": "WebUI 暗色模式",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后 WebUI 管理面板使用暗色主题"
+  },
+  "enabled": {
+    "description": "插件总开关",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后插件不注入任何提示词，也不提供任何工具"
+  },
+  "prompt_injection_enabled": {
+    "description": "LLM 群管提示词注入开关",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后 LLM 不会收到群管工具的使用说明和权限规则"
+  },
+  "group_white_list": {
+    "description": "群白名单：只有列表中的群启用审核和群管功能；留空表示所有群启用",
+    "type": "list",
+    "default": [],
+    "invisible": true,
+    "hint": "设置后仅白名单群生效（审核/防刷屏/群管指令/多群配置均受限于白名单）。已迁移到 SQLite，请在 WebUI「设置-名单管理」或「群管理」中维护"
+  },
+  "group_black_list": {
+    "description": "群黑名单：列表中的群完全禁用本插件全部功能",
+    "type": "list",
+    "default": [],
+    "invisible": true,
+    "hint": "黑名单群不做审核、不响应群管指令。与白名单同时设置时黑名单优先。已迁移到 SQLite，请在 WebUI 中维护"
+  },
+  "user_black_list": {
+    "description": "用户黑名单：黑名单用户群内发言即被踢出+禁言，加群申请自动拒绝",
+    "type": "list",
+    "default": [],
+    "invisible": true,
+    "hint": "适合拉黑广告号/捣乱号。已迁移到 SQLite，请在 WebUI 中维护"
+  },
+  "user_white_list": {
+    "description": "用户白名单：白名单用户完全豁免内容审核与防刷屏检测",
+    "type": "list",
+    "default": [],
+    "invisible": true,
+    "hint": "适合豁免其他机器人账号或可信成员。已迁移到 SQLite，请在 WebUI 中维护"
+  },
+  "admin_list": {
+    "description": "管理员 QQ 号列表",
+    "type": "list",
+    "invisible": true,
+    "default": [],
+    "hint": "必须填写！列表中的 QQ 号才能使用管理指令和 LLM 群管工具。按发送者 ID 原样比对：非 QQ 号平台（如 QQ 官方机器人）需填写该平台的用户 ID，被拒时机器人回复中会给出"
+  },
+  "auto_moderate_enabled": {
+    "description": "自动审核总开关（检测骂人和广告自动撤回）",
+    "type": "bool",
+    "default": true,
+    "hint": "管理员可通过 /auto_moderate on/off 命令随时启停"
+  },
+  "ai_relay_mode_enabled": {
+    "description": "AI 中转特殊检测模式（高误伤风险）",
+    "type": "bool",
+    "default": false,
+    "invisible": true,
+    "hint": "严厉警告：仅供明确禁止相关数字内容的 AI 中转群使用，不是 AI 语义识别。默认关闭；必须先完成两项风险勾选并输入确认句才生效。可按群覆盖，但不能绕过全局风险确认。关闭全局模式会撤销风险确认；群黑白名单、用户白名单、自动审核总开关和管理员豁免仍生效。"
+  },
+  "ai_relay_zero_guard_enabled": {
+    "description": "AI 特殊版：0. / 前导零数字直接撤回",
+    "type": "bool",
+    "default": false,
+    "invisible": true,
+    "hint": "高误伤规则：原样匹配任意位置的 0.，以及独立的 0 开头三位/00 开头四位数字。0.0、0.2、10.5、100.0%、v1.0.1、012、0012 均可能命中！开启后直接撤回，不经 LLM 复核，不附加禁言/踢人。需要 AI 特殊模式与三项全局风险确认；可按群覆盖。"
+  },
+  "ai_relay_ack_recall": {
+    "description": "AI 特殊版风险确认 1/3：接受直接撤回",
+    "type": "bool",
+    "default": false,
+    "invisible": true,
+    "hint": "确认：匹配内容将直接撤回、不经 AI 复核，误撤回无法由插件自动恢复。建议在插件 WebUI 的 AI 特殊版页完成三步确认；此项是全局风险确认，不支持按群覆盖。"
+  },
+  "ai_relay_ack_false_positive": {
+    "description": "AI 特殊版风险确认 2/3：接受正常数字误伤",
+    "type": "bool",
+    "default": false,
+    "invisible": true,
+    "hint": "确认：正常价格、版本号、百分比、数字编号也可能误撤回，例如 10.5、v1.0.1、100.0%、012。不要在普通交流群启用；此项是全局风险确认，不支持按群覆盖。"
+  },
+  "ai_relay_risk_ack": {
+    "description": "AI 特殊版风险确认 3/3：输入确认句",
+    "type": "string",
+    "default": "",
+    "invisible": true,
+    "hint": "必须逐字输入：我确认启用AI特殊检测并承担误撤回风险。两项勾选与本确认句缺一不可；不是访问密钥。关闭全局模式会清空确认，重新开启需重新确认。"
+  },
+  "moderation_admin_exempt": {
+    "description": "管理员豁免消息内容审核",
+    "type": "bool",
+    "default": false,
+    "hint": "关闭时群主、群管理员和插件管理员也会进入消息内容审核，便于测试且避免管理员账号成为广告绕过通道；防刷屏仍始终豁免管理员。可按群覆盖"
+  },
+  "official_bot_exempt_enabled": {
+    "description": "豁免QQ开放平台机器人消息检测",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后自动识别 QQ 开放平台（官方）机器人的消息并跳过内容审核与防刷屏。以协议端上报的 is_robot 标记为准（NapCat 支持），号段内的真实 QQ 号不会被误豁免；协议端不上报该标记时才退回按 288/388/389 虚拟号段识别，此时号段内的真实账号也会被豁免，必要时请关闭本开关改用用户白名单。可按群覆盖"
+  },
+  "moderation_require_bot_admin": {
+    "description": "机器人非管理员时跳过自动审核",
+    "type": "bool",
+    "default": true,
+    "hint": "机器人在某群只是普通成员时无法撤回或禁言，继续审核只会白耗 LLM 调用并干扰群聊。开启后确认机器人不是管理员/群主的群会跳过自动审核与防刷屏，并在日志中每小时提示一次；角色查询失败时不跳过。被设为管理员后立即恢复。可按群覆盖（Issue #89）"
+  },
+  "link_whitelist": {
+    "description": "链接白名单（允许的域名）",
+    "type": "list",
+    "default": [],
+    "hint": "指向这些域名的普通链接不再触发广告/违规网址等本地规则，也会告知 LLM 这些域名是允许的；消息其余内容照常审核。按主机名匹配并包含子域名：填 bilibili.com 可覆盖 www./m./space. 等全部子域，填 www.bilibili.com 则只放行该主机。用方框字、带圈字等伪装的链接不受白名单豁免（Issue #89）"
+  },
+  "auto_moderate_notice": {
+    "description": "撤回提示开关（撤回后是否在群内发说明消息）",
+    "type": "bool",
+    "default": true,
+    "hint": "开启后，消息被自动撤回/处罚时在群内发送提示（内容见 ban_notice 模板）。关闭则静默处理，不打扰群聊。统一管控三条撤回路径：规则命中撤回、LLM审核撤回、QQ收藏撤回"
+  },
+  "scan_swear": {
+    "description": "辱骂脏话检测开关",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后不使用正则匹配辱骂/脏话内容"
+  },
+  "scan_ad": {
+    "description": "广告推广检测开关",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后不使用正则匹配广告/推广/引流内容"
+  },
+  "custom_swear_keywords": {
+    "description": "自定义脏话关键词（追加到脏话检测规则）",
+    "type": "list",
+    "default": [],
+    "hint": "纯文本关键词，保存后即时并入 AC 自动机。也可用 /添加违禁词 脏话 <词> 指令添加（指令添加的存入规则库）"
+  },
+  "custom_ad_keywords": {
+    "description": "自定义广告关键词（追加到广告检测规则）",
+    "type": "list",
+    "default": [],
+    "hint": "纯文本关键词，保存后即时并入 AC 自动机。也可用 /添加违禁词 广告 <词> 指令添加"
+  },
+  "combine_detect_enabled": {
+    "description": "组合消息检测开关（防分段发送规避）",
+    "type": "bool",
+    "default": true,
+    "hint": "把违禁词拆成多条消息逐字发送（如 外/挂/进/群 四条消息）时，聚合该用户近期消息合并检测，命中则撤回全部涉及消息"
+  },
+  "combine_detect_count": {
+    "description": "组合检测聚合条数",
+    "type": "int",
+    "default": 5,
+    "hint": "聚合该用户最近多少条消息做合并检测，范围 2-20"
+  },
+  "combine_detect_window_seconds": {
+    "description": "组合检测时间窗口（秒）",
+    "type": "int",
+    "default": 60,
+    "hint": "只聚合该窗口内的消息，范围 5-600 秒"
+  },
+  "llm_moderation_enabled": {
+    "description": "LLM 二次审核开关",
+    "type": "bool",
+    "default": true,
+    "hint": "开启后，规则候选、同一发送者近期多条组合及已启用 OCR/二维码识别的图片文本会由 LLM 结合上下文确认；关闭则按本地规则处理"
+  },
+  "llm_moderation_always": {
+    "description": "普通消息全量 AI 审核",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后所有可审核消息均送 LLM，并拉取群聊历史和同一发送者分段上下文；图片/表情包会自动尝试 OCR 与二维码解析。会显著增加调用量，可按群覆盖"
+  },
+  "base_decode_enabled": {
+    "description": "Base 系列编码内容解码审核",
+    "type": "bool",
+    "default": true,
+    "hint": "自动识别并受限解码 Base16/32/58/62/64/Base64URL/85（含双层编码），把可读结果送入现有规则、上下文和 LLM 审核。随机字符串不会因仅能解码而直接处罚；可按群覆盖"
+  },
+  "llm_max_concurrency": {
+    "description": "LLM 全局最大并发",
+    "type": "int",
+    "default": 12,
+    "hint": "消息、OCR、入群和名片审核共享的并发上限，范围 1-32；修改后需重载插件。OCR 内部最多占 4 路，避免阻塞正文审核"
+  },
+  "llm_moderation_ban": {
+    "description": "LLM 审核违规后自动禁言",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后 LLM 判定违规只撤回不禁言"
+  },
+  "moderation_ban_duration": {
+    "description": "自动审核禁言时长（秒）",
+    "type": "int",
+    "default": 1800,
+    "hint": "自动审核触发违规后的禁言时长，单位秒，默认 1800 秒（30分钟）"
+  },
+  "moderation_llm_provider_id": {
+    "description": "审核使用的 LLM Provider",
+    "type": "string",
+    "_special": "select_provider",
+    "default": "",
+    "hint": "留空则自动使用第一个可用的 LLM Provider 做审核"
+  },
+  "ban_notice": {
+    "description": "封禁通知模板",
+    "type": "string",
+    "default": "[群管] {name}({uid}) 的消息已被撤回（违规内容）",
+    "hint": "支持变量：{name} 用户名、{uid} QQ号、{group} 群号、{reason} 违规原因"
+  },
+  "ban_enabled": {
+    "description": "禁言功能开关",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后 /禁言 指令和 LLM 禁言工具均不可用"
+  },
+  "unban_enabled": {
+    "description": "解除禁言功能开关",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后 /解禁 指令和 LLM 解禁工具均不可用"
+  },
+  "kick_enabled": {
+    "description": "踢人功能开关",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后 /踢人 指令和 LLM 踢人工具均不可用"
+  },
+  "set_admin_require_owner": {
+    "description": "严格模式：设置/取消管理员仅群主可用",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后 /设置管理 /取消管理 及对应 LLM 工具只认本群群主，插件全局管理员也不例外（Issue #35）"
+  },
+  "llm_moderation_custom_prompt": {
+    "description": "自定义 LLM 审核标准（留空用内置）",
+    "type": "text",
+    "default": "",
+    "hint": "填写后替换内置的审核标准段落（如嫌默认标准太激进可自行放宽）。JSON 输出格式约束由框架自动追加，无需自己写。可按群覆盖（Issue #39）"
+  },
+  "moderation_review_enabled": {
+    "description": "误判样本定期复盘",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后定期用 LLM 复盘管理员标记的误判样本，只生成待确认的修正规则候选，不会自动修改审核提示词"
+  },
+  "moderation_review_interval": {
+    "description": "误判复盘间隔（秒）",
+    "type": "int",
+    "default": 86400,
+    "hint": "自动复盘间隔，范围 300-604800 秒；也可在违规记录页手动立即复盘"
+  },
+  "moderation_review_min_samples": {
+    "description": "自动复盘最少误判样本数",
+    "type": "int",
+    "default": 3,
+    "hint": "待复盘误判达到该数量才自动调用 LLM，范围 1-20；手动复盘只需 1 条"
+  },
+  "llm_moderation_review_guidance": {
+    "description": "已应用的误判修正规则",
+    "type": "text",
+    "default": "",
+    "hint": "由误判复盘候选经管理员确认后写入，作为内置或自定义审核标准的补充；可在复盘记录中回滚"
+  },
+  "member_action_require_group_role": {
+    "description": "严格模式：群管指令仅群主/群管理员可用",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后 /禁言 /踢人 /设置名片 等群管指令要求操作者本群角色为群主或群管理员，即使是插件全局管理员在其非群管的群里也不能通过指令操作（防止跨群乱踢人）。查询指令与 WebUI 远程执行不受此限制"
+  },
+  "kick_recall_enabled": {
+    "description": "踢人时自动撤回该成员最近消息",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后踢人时自动撤回该成员最近的消息，条数由下方配置控制"
+  },
+  "kick_recall_count": {
+    "description": "踢人撤回消息条数",
+    "type": "int",
+    "default": 10,
+    "hint": "踢人时自动撤回该成员最近的消息条数，范围 1-50"
+  },
+  "whole_ban_enabled": {
+    "description": "全体禁言功能开关",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后 /全体禁言 指令和 LLM 工具均不可用"
+  },
+  "set_card_enabled": {
+    "description": "修改群名片功能开关",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后 /设置名片 指令和 LLM 工具均不可用"
+  },
+  "send_announcement_enabled": {
+    "description": "发送群公告功能开关",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后 /发公告 指令和 LLM 工具均不可用"
+  },
+  "delete_announcement_enabled": {
+    "description": "删除群公告功能开关",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后 /删公告 指令和 LLM 工具均不可用"
+  },
+  "list_announcements_enabled": {
+    "description": "查看群公告列表功能开关",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后 /公告列表 指令均不可用"
+  },
+  "member_list_enabled": {
+    "description": "查看群成员列表功能开关",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后 /成员列表 和 /搜索成员 指令均不可用"
+  },
+  "set_admin_enabled": {
+    "description": "设置群管理员功能开关",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后 /设置管理 指令和 LLM 工具均不可用"
+  },
+  "set_group_name_enabled": {
+    "description": "修改群名称功能开关",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后 /群名 指令和 LLM 工具均不可用"
+  },
+  "set_title_enabled": {
+    "description": "设置专属头衔功能开关",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后 /头衔 指令和 LLM 工具均不可用"
+  },
+  "banned_list_enabled": {
+    "description": "查看禁言列表功能开关",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后 /禁言列表 指令和 LLM 工具均不可用"
+  },
+  "join_verify_enabled": {
+    "description": "设置加群方式功能开关",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后 /加群方式 指令和 LLM 工具均不可用"
+  },
+  "recall_enabled": {
+    "description": "撤回消息功能开关",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后 /撤回最新消息 和 /批量撤回 指令均不可用（自动审核的撤回不受此控制）"
+  },
+  "essence_enabled": {
+    "description": "精华消息功能开关",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后 /设精华 和 /取消精华 指令和 LLM 工具均不可用"
+  },
+  "group_files_enabled": {
+    "description": "群文件管理功能开关",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后群文件查看/上传/删除/移动/重命名等全部不可用"
+  },
+  "group_honor_enabled": {
+    "description": "群荣誉查看功能开关",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后群荣誉查看 LLM 工具不可用"
+  },
+  "at_all_remain_enabled": {
+    "description": "@全体成员剩余次数查询开关",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后 @全体成员剩余次数查询 LLM 工具不可用"
+  },
+  "ignore_requests_enabled": {
+    "description": "被忽略加群请求查看开关",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后被忽略加群请求查看 LLM 工具不可用"
+  },
+  "group_msg_history_enabled": {
+    "description": "群消息历史查看开关",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后群消息历史查看 LLM 工具不可用"
+  },
+  "group_portrait_enabled": {
+    "description": "群头像设置功能开关",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后群头像设置 LLM 工具不可用"
+  },
+  "group_sign_enabled": {
+    "description": "群打卡功能开关",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后群打卡 LLM 工具不可用"
+  },
+  "anti_flood_enabled": {
+    "description": "防刷屏总开关",
+    "type": "bool",
+    "default": true,
+    "hint": "开启后自动检测并处理刷屏行为。按滑动窗口统计最近1秒/60秒/3600秒内的消息数，不按自然日累计；所有消息类型均计入，包括转发、QQ收藏、图片等"
+  },
+  "anti_flood_rate_per_second": {
+    "description": "最近1秒消息上限（0=关闭本项检测）",
+    "type": "int",
+    "default": 5,
+    "hint": "用户最近1秒消息数超过此值判定为刷屏。填写5表示第6条触发；设为0可关闭本档"
+  },
+  "anti_flood_rate_per_minute": {
+    "description": "最近1分钟消息上限（0=关闭本项检测）",
+    "type": "int",
+    "default": 20,
+    "hint": "用户最近60秒消息数超过此值判定为刷屏。填写20表示第21条触发；设为0可关闭本档"
+  },
+  "anti_flood_rate_per_hour": {
+    "description": "最近1小时消息上限（0=关闭本项检测）",
+    "type": "int",
+    "default": 60,
+    "hint": "用户最近3600秒消息数超过此值判定为刷屏，不按自然小时或当天累计；设为0可关闭本档"
+  },
+  "anti_flood_night_enabled": {
+    "description": "凌晨/夜间独立限速开关",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后在指定夜间时段使用单独的每秒/每分钟/每小时消息上限。适合凌晨低活跃时段收紧刷屏阈值"
+  },
+  "anti_flood_night_start_hour": {
+    "description": "夜间限速开始小时（0-23）",
+    "type": "int",
+    "default": 0,
+    "hint": "按服务器本地时间判断。0 表示 00:00；支持跨天区间，如 23 到 6 表示 23:00-次日06:00"
+  },
+  "anti_flood_night_end_hour": {
+    "description": "夜间限速结束小时（0-23）",
+    "type": "int",
+    "default": 6,
+    "hint": "按服务器本地时间判断。开始小时与结束小时相同表示全天使用夜间阈值"
+  },
+  "anti_flood_night_rate_per_second": {
+    "description": "夜间最近1秒消息上限（0=关闭本项检测）",
+    "type": "int",
+    "default": 3,
+    "hint": "夜间时段用户最近1秒消息数超过此值判定为刷屏"
+  },
+  "anti_flood_night_rate_per_minute": {
+    "description": "夜间最近1分钟消息上限（0=关闭本项检测）",
+    "type": "int",
+    "default": 10,
+    "hint": "夜间时段用户最近60秒消息数超过此值判定为刷屏"
+  },
+  "anti_flood_night_rate_per_hour": {
+    "description": "夜间最近1小时消息上限（0=关闭本项检测）",
+    "type": "int",
+    "default": 30,
+    "hint": "夜间时段用户最近3600秒消息数超过此值判定为刷屏，不按当天累计"
+  },
+  "anti_flood_mute_duration": {
+    "description": "刷屏禁言时长（秒，0=仅撤回不禁言）",
+    "type": "int",
+    "default": 300,
+    "hint": "检测到刷屏后自动禁言多少秒，设为 0 则只撤回不禁言。默认300秒（5分钟）"
+  },
+  "anti_flood_recall_enabled": {
+    "description": "刷屏消息自动撤回开关",
+    "type": "bool",
+    "default": true,
+    "hint": "开启后刷屏消息会被自动撤回；关闭则只禁言不撤回"
+  },
+  "anti_flood_recall_threshold": {
+    "description": "撤回阈值（条数）",
+    "type": "int",
+    "default": 20,
+    "hint": "刷屏消息数超过此值才进行批量撤回，防止少量超限就被撤回，默认20条"
+  },
+  "repeat_detect_enabled": {
+    "description": "重复消息检测开关",
+    "type": "bool",
+    "default": true,
+    "hint": "开启后检测短时间内重复发送相同内容的刷屏行为"
+  },
+  "repeat_detect_window_seconds": {
+    "description": "重复消息检测窗口（秒）",
+    "type": "int",
+    "default": 120,
+    "hint": "在最近 N 秒内统计同一内容重复次数，默认120秒，最大3600秒；不按当天累计，设0关闭"
+  },
+  "repeat_detect_count": {
+    "description": "重复消息触发次数",
+    "type": "int",
+    "default": 3,
+    "hint": "同一内容在检测窗口内达到该次数即触发处理，默认第3次触发；中间夹其他消息也会计数"
+  },
+  "long_text_detect_enabled": {
+    "description": "长文本刷屏检测开关",
+    "type": "bool",
+    "default": true,
+    "hint": "开启后检测超长消息，防止通过大段文本刷屏"
+  },
+  "long_text_threshold": {
+    "description": "长文本长度阈值（字符）",
+    "type": "int",
+    "default": 500,
+    "hint": "单条消息长度超过该值触发处理；设 0 关闭"
+  },
+  "lexicon_political_enabled": {
+    "description": "外置词库-政治敏感类检测",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后不检测政治敏感关键词"
+  },
+  "lexicon_porn_enabled": {
+    "description": "外置词库-色情淫秽类检测",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后不检测色情淫秽关键词"
+  },
+  "lexicon_violent_enabled": {
+    "description": "外置词库-暴恐内容类检测",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后不检测暴恐内容关键词"
+  },
+  "lexicon_reactionary_enabled": {
+    "description": "外置词库-反动言论类检测",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后不检测反动言论关键词"
+  },
+  "lexicon_weapons_enabled": {
+    "description": "外置词库-涉枪涉爆类检测",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后不检测涉枪涉爆关键词"
+  },
+  "lexicon_corruption_enabled": {
+    "description": "外置词库-贪腐相关类检测",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后不检测贪腐相关关键词"
+  },
+  "lexicon_illegal_url_enabled": {
+    "description": "外置词库-违规网址类检测",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后不检测违规网址（仅匹配词库中的网址）"
+  },
+  "lexicon_other_enabled": {
+    "description": "外置词库-其他违规类检测",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后不检测补充词库、民生敏感、腾讯封禁等其他类别"
+  },
+  "scan_forward_msg": {
+    "description": "合并转发消息审核开关",
+    "type": "bool",
+    "default": true,
+    "hint": "开启后会解析合并转发消息内容进行审核"
+  },
+  "ocr_enabled": {
+    "description": "OCR识图审核开关",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后会使用LLM视觉模型识别图片内容进行审核，需要配置支持视觉的LLM"
+  },
+  "ocr_provider_id": {
+    "description": "OCR使用的视觉LLM Provider（可选）",
+    "type": "string",
+    "_special": "select_provider",
+    "default": "",
+    "hint": "选择支持视觉/图片理解的 Provider；留空时依次回退到审核 Provider 和 AstrBot 当前默认 Provider"
+  },
+  "ocr_prompt_template": {
+    "description": "OCR提示词模板",
+    "type": "string",
+    "default": "default",
+    "options": [
+      "default",
+      "strict",
+      "text_only"
+    ],
+    "hint": "default=通用识别、strict=严格审核、text_only=纯文字转录；填写自定义提示词后此项无效"
+  },
+  "ocr_custom_system_prompt": {
+    "description": "OCR自定义系统提示词",
+    "type": "text",
+    "default": "",
+    "hint": "留空使用模板提示词；填写后将覆盖模板的system_prompt（需同时填写用户提示词）"
+  },
+  "ocr_custom_user_prompt": {
+    "description": "OCR自定义用户提示词",
+    "type": "text",
+    "default": "",
+    "hint": "留空使用模板提示词；填写后将覆盖模板的user_prompt（需同时填写系统提示词）"
+  },
+  "recall_qq_favorite_enabled": {
+    "description": "QQ收藏内容自动撤回开关",
+    "type": "bool",
+    "default": true,
+    "hint": "开启后检测到QQ收藏转发的消息会自动撤回"
+  },
+  "scan_sticker_enabled": {
+    "description": "表情包/商城表情审核开关",
+    "type": "bool",
+    "default": true,
+    "hint": "开启后会通过OCR识别商城表情图片内容进行审核（需同时开启OCR）"
+  },
+  "qrcode_decode_enabled": {
+    "description": "二维码解码审核开关",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后精确解码图片/表情包中的二维码，把二维码里的URL/文本注入审核管线（拦截扫码进群/加好友引流）。解码库(opencv)已随插件默认安装，直接开启即可，无需额外配置视觉模型。注意：开启后每条图片消息都会下载并解码，繁忙群聊有一定网络/CPU开销"
+  },
+  "word_count_enabled": {
+    "description": "字数统计功能开关",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后允许使用 /字数统计 查询最近群消息中的关键词出现次数"
+  },
+  "group_stats_enabled": {
+    "description": "群统计功能开关",
+    "type": "bool",
+    "default": true,
+    "hint": "开启后允许使用 /群统计 查看群成员数量与管理员统计"
+  },
+  "join_audit_enabled": {
+    "description": "入群自动审核开关（F1）",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后自动处理加群申请：显式拒绝词优先，通过词可放行；违禁词库候选在未开启入群 LLM 时直接拒绝，开启后交由 LLM 二审；其余按默认动作"
+  },
+  "join_audit_notify": {
+    "description": "入群审核结果群内通知",
+    "type": "bool",
+    "default": true,
+    "hint": "开启后自动审核通过/拒绝时在群内发送通知消息"
+  },
+  "join_accept_keywords": {
+    "description": "入群-自动通过关键词",
+    "type": "list",
+    "default": [],
+    "hint": "申请验证消息命中任一关键词即自动通过（按群细化请用 WebUI 规则）。默认为包含匹配；以 = 开头为精确匹配，如 =原神 要求答案恰好是「原神」"
+  },
+  "join_reject_keywords": {
+    "description": "入群-自动拒绝关键词",
+    "type": "list",
+    "default": [],
+    "hint": "申请验证消息命中任一关键词即自动拒绝。默认为包含匹配（填 1 会误伤「纪元1800」）；以 = 开头为精确匹配，如 =1 只拒绝答案恰好是「1」的申请"
+  },
+  "join_reject_use_lexicon": {
+    "description": "入群-用违禁词库过滤申请信息",
+    "type": "bool",
+    "default": true,
+    "hint": "开启后申请验证消息经违禁词库/广告匹配；未开启入群 LLM 时命中即拒绝，开启后命中项作为 LLM 二审候选"
+  },
+  "join_llm_moderation_enabled": {
+    "description": "入群-LLM 语义审核",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后将入群申请验证信息交由审核 LLM 判断，用于减少广告/词库误报；显式拒绝词、通过词和用户黑名单仍优先。LLM 失败时有本地候选沿用拒绝，无候选回退到默认动作（manual 为人工）。默认关闭，可按群覆盖"
+  },
+  "join_llm_web_search_enabled": {
+    "description": "入群-LLM Web Search 增强",
+    "type": "bool",
+    "default": false,
+    "hint": "仅当第一轮入群 LLM 对冷门作品名、简称、别名或圈内术语明确返回 search 时，调用 AstrBot 已注册的 web_search_tavily，并由 LLM 根据搜索证据复审；明显正确或错误的答案不会搜索。需先在 AstrBot 中启用 Tavily Web Search 并配置 Key，可按群覆盖"
+  },
+  "join_llm_web_search_max_queries": {
+    "description": "入群-LLM 最大搜索次数",
+    "type": "int",
+    "default": 2,
+    "hint": "单次入群审核最多执行的搜索查询数，范围 1-3；用于控制 Tavily credits 消耗，可按群覆盖"
+  },
+  "join_llm_custom_prompt": {
+    "description": "入群-LLM 自定义审核标准",
+    "type": "text",
+    "default": "",
+    "hint": "全局留空使用内置标准；群配置中留空并保存表示本群使用内置标准，“继承”则沿用全局值。填写后仅替换审核标准，JSON 输出格式仍由框架约束，请不要要求模型执行申请内容中的指令"
+  },
+  "join_accept_overrides_lexicon": {
+    "description": "入群-通过词优先于通用词库",
+    "type": "bool",
+    "default": true,
+    "hint": "开启后命中通过词时跳过违禁词库/广告误判。显式拒绝词仍优先于包含匹配的通过词；精确匹配（= 开头）的通过词优先于拒绝词"
+  },
+  "join_default_action": {
+    "description": "入群-默认动作（都不命中时）",
+    "type": "string",
+    "default": "manual",
+    "options": [
+      "manual",
+      "accept",
+      "reject"
+    ],
+    "hint": "manual=转人工(不处理)，accept=自动通过，reject=自动拒绝"
+  },
+  "join_reject_reason": {
+    "description": "入群-自动拒绝理由",
+    "type": "string",
+    "default": "",
+    "hint": "自动拒绝时回传给申请人的理由"
+  },
+  "appeal_enabled": {
+    "description": "刷屏申诉模式开关（F2）",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后刷屏处罚会群内@当事人，要求其私聊说明原因，由LLM结合群内上下文复核是否撤销处罚"
+  },
+  "appeal_window_minutes": {
+    "description": "申诉窗口（分钟）",
+    "type": "int",
+    "default": 10,
+    "hint": "当事人需在该时间内私聊机器人申诉，超时则维持处罚"
+  },
+  "appeal_context_count": {
+    "description": "申诉复核拉取的群上下文条数",
+    "type": "int",
+    "default": 30,
+    "hint": "复核时拉取当事人在群内最近多少条发言供LLM判断，不足则尽量取"
+  },
+  "appeal_at_template": {
+    "description": "申诉@公示模板",
+    "type": "text",
+    "default": "",
+    "hint": "群内@当事人的提示文案，支持 {name} 昵称、{minutes} 申诉窗口分钟数；留空用默认文案"
+  },
+  "auto_unban_enabled": {
+    "description": "定时自动解禁开关（F3）",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后插件发起的禁言会登记到期解禁，后台任务到点自动解除（重启不丢）。OneBot本身到期会解禁，本功能主要用于永久禁言托管与重启补解禁"
+  },
+  "auto_unban_scan_interval": {
+    "description": "定时解禁扫描间隔（秒）",
+    "type": "int",
+    "default": 60,
+    "hint": "后台任务多久扫描一次到期解禁，范围 10-3600 秒"
+  },
+  "auto_unban_permanent_hours": {
+    "description": "永久禁言托管解禁时长（小时）",
+    "type": "int",
+    "default": 168,
+    "hint": "对永久禁言(时长0)登记的兜底解禁时长，默认168小时(7天)"
+  },
+  "group_admin_grant_enabled": {
+    "description": "群管理员动态授权总开关（F5）",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后，在已配置授权且被允许（白名单内）的群里，群主/群管理员自动获得【本群】群管操作权限（非插件全局管理员），被下管理后最多10秒内失效。按群授权请用 /群管理授权 或 WebUI"
+  },
+  "legacy_role_admin_enabled": {
+    "description": "兼容：群主/管理员默认拥有本群群管操作权限",
+    "type": "bool",
+    "default": true,
+    "hint": "保持历史行为：白名单内（或未设白名单且非黑名单）群的群主/管理员默认可用群管命令（仅本群，非插件全局管理员）。若只想用F5按群精细授权，可关闭此项"
+  },
+  "card_monitor_enabled": {
+    "description": "名片监控总开关",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后处理入群即时检查、群成员名片变更、周期同步兜底及管理员任免通知；事件能力取决于协议端，周期同步使用群成员列表查询。默认关闭，请在 WebUI「名片监控」页配置各子功能"
+  },
+  "card_sync_enabled": {
+    "description": "名片周期同步兜底",
+    "type": "bool",
+    "default": true,
+    "hint": "开启后按间隔查询群成员名片，弥补协议端不发送 group_card 通知导致的漏检；仅在名片监控总开关开启时生效"
+  },
+  "card_sync_interval": {
+    "description": "名片同步间隔（秒）",
+    "type": "int",
+    "default": 120,
+    "hint": "低频查询群成员名片的间隔，可设 30-3600 秒；普通成员首次同步只建立基线，保护名单成员若偏离预设名片会立即还原"
+  },
+  "card_log_enabled": {
+    "description": "名片变更/管理员任免记日志",
+    "type": "bool",
+    "default": true,
+    "hint": "记录所有名片变更（谁的名片、旧→新、时间）和管理员任免事件到「名片监控」页。注意：协议不上报操作者，无法区分本人改还是管理员改"
+  },
+  "card_monitor_notify": {
+    "description": "名片还原时群内通知",
+    "type": "bool",
+    "default": true,
+    "hint": "触发名片保护还原/违规名片还原时在群内发送通知消息"
+  },
+  "card_protect_enabled": {
+    "description": "名片保护/还原",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后，保护名单内成员的名片被改动会自动改回预设名片。保护名单在 WebUI「名片监控」页维护"
+  },
+  "card_audit_link_only": {
+    "description": "名片仅拦链接/店铺（宽松）",
+    "type": "bool",
+    "default": false,
+    "hint": "只拦截含网址链接/二维码/店铺域名的名片，允许引流缩写、联系方式暗示（如 xxxrxxx）等自定义昵称。命中即还原为旧名片"
+  },
+  "card_audit_enabled": {
+    "description": "违规名片全量审核",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后名片经词库/正则初筛+LLM上下文判断（同消息审核），拦引流/辱骂/违禁词等并还原。与「仅拦链接」同时开启时以本项严格模式为准"
+  },
+  "card_audit_admin_exempt": {
+    "description": "管理员豁免违规名片审核",
+    "type": "bool",
+    "default": true,
+    "hint": "开启后群主、群管理员和插件管理员跳过违规名片审核；名片变更日志仍记录，名片保护名单的强制还原仍会执行。可按群覆盖"
+  },
+  "card_audit_llm_always": {
+    "description": "名片强制全量送LLM判断",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后即使初筛未命中也把每个名片送LLM判断，用于识别 ldxp/catfk 这类无规律引流缩写黑话（成本高，仅在「违规名片全量审核」开启时生效）"
+  },
+  "admin_change_notify_enabled": {
+    "description": "管理员任免群内通知",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后，有人被设为/被取消群管理员时在群内发送通知（协议不含操作者，只报被任免者）"
+  },
+  "recall_reply_notice": {
+    "description": "「/回复撤回」成功后回复确认消息",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后 /回复撤回 撤回成功时静默处理，不再回复「已撤回被引用的消息」（Issue #44）。撤回失败的错误提示不受影响，仍会提示"
+  },
+  "moderation_llm_fail_closed": {
+    "description": "LLM 不可用时严格拦截（fail-closed）",
+    "type": "bool",
+    "default": false,
+    "hint": "默认关：LLM 全部不可用时，除超长内容和高置信度脏话外的命中会放行，避免 Provider 抖动导致误封。开启后，只要命中任一规则/词库类别，LLM 降级时也一律按规则处罚"
+  },
+  "lexicon_learn_enabled": {
+    "description": "自适应上下文学习总开关",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后 AI 定期从群聊上下文挖掘本群特有的引流/广告黑话（如 AI中转、plus日抛team），沉淀为按群独立的候选词。默认关闭；候选词需在 WebUI「词库学习」页审批后才生效。可按群覆盖"
+  },
+  "lexicon_learn_interval": {
+    "description": "上下文学习挖掘间隔（秒）",
+    "type": "int",
+    "default": 300,
+    "hint": "多久从群聊缓冲挖掘一次候选词，范围 30-3600 秒。间隔越短越及时但 LLM 调用越多；示例值 300（5分钟）"
+  },
+  "lexicon_learn_auto_apply": {
+    "description": "自动生效学习词（多维度自动审批）",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后候选词经【多维度自动审批门】（置信度+出现频次+词形+非常用词+对抗式LLM复核）全部通过即【不经人工】自动生效并参与撤回判断；任一维度不过则转人工。默认关，开启前建议先在候选列表观察学习质量"
+  },
+  "lexicon_learn_verify_llm": {
+    "description": "自动审批的对抗式LLM复核",
+    "type": "bool",
+    "default": true,
+    "hint": "自动生效前额外用一次 LLM【反驳复核】该词是否会误伤正常消息，从严判定；关闭会加快自动生效但显著提高误封风险。仅在「自动生效学习词」开启时生效"
+  },
+  "lexicon_learn_min_occurrences": {
+    "description": "学习词自动生效所需出现次数",
+    "type": "int",
+    "default": 3,
+    "hint": "同一候选词需跨轮累计出现达到该次数才允许自动生效（仅在自动生效开启时约束），范围 1-100。人工审批不受此限"
+  },
+  "lexicon_learn_min_confidence": {
+    "description": "学习词自动生效置信度阈值",
+    "type": "float",
+    "default": 0.75,
+    "hint": "LLM 对候选词的置信度需≥该值才允许自动生效，范围 0-1（仅在自动生效开启时约束）"
+  },
+  "lexicon_learn_min_length": {
+    "description": "学习词最小长度",
+    "type": "int",
+    "default": 2,
+    "hint": "低于该长度的候选词直接丢弃，避免把单字/超短常用词学成违禁词，范围 2-20"
+  },
+  "lexicon_learn_max_per_run": {
+    "description": "单轮单群最多接纳候选数",
+    "type": "int",
+    "default": 10,
+    "hint": "每次挖掘每个群最多接纳多少个候选词，防止一次性灌入过多，范围 1-50"
+  },
+  "lexicon_learn_sample_size": {
+    "description": "每次挖掘的消息样本数",
+    "type": "int",
+    "default": 60,
+    "hint": "每次从群聊缓冲取最近多少条消息喂给学习模型，范围 15-300。越大越全面但单次 LLM 开销越高"
+  },
+  "lexicon_learn_provider_id": {
+    "description": "上下文学习使用的模型",
+    "type": "string",
+    "_special": "select_provider",
+    "default": "",
+    "hint": "留空则复用审核模型/首个可用 Provider。可单独指定一个便宜的模型做词库学习，降低成本"
+  },
+  "lexicon_learn_allowlist": {
+    "description": "学习白名单（永不学习的词）",
+    "type": "list",
+    "default": [],
+    "hint": "列在此处的词永远不会被学成违禁词，用于保护本群常用词/正常商品名，避免误伤"
+  },
+  "moderation_require_ai_confirmation": {
+    "description": "自动处罚必须经过AI确认",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后，超长消息和伪装链接也先交AI判断；AI异常时不撤回、不禁言。可按群覆盖。"
+  },
+  "join_empty_auto_accept": {
+    "description": "空白入群申请自动通过",
+    "type": "bool",
+    "default": false,
+    "hint": "仍须通过QQ等级门槛；不会绕过黑名单和拒绝规则。"
+  },
+  "join_min_qq_level": {
+    "description": "自动通过要求的最低QQ等级",
+    "type": "int",
+    "default": 0,
+    "hint": "0关闭。等级隐藏、未知或查询失败时转人工，不自动放行。"
+  },
+  "moderation_notify_private_enabled": {
+    "description": "违规处理后私聊通知管理员",
+    "type": "bool",
+    "default": false,
+    "hint": "发送群号、违规用户QQ、处理结果和消息摘要，是否踢人由管理员决定。"
+  },
+  "moderation_notify_admin_id": {
+    "description": "违规私聊通知接收QQ",
+    "type": "string",
+    "default": "",
+    "hint": "只通知这个账号，不向所有管理员群发。"
+  },
+  "moderation_notify_at_fallback": {
+    "description": "私聊失败时在群内@通知接收者",
+    "type": "bool",
+    "default": true,
+    "hint": "群内只发送简短提醒，不重复广告原文。"
+  },
+  "management": {
+    "type": "object",
+    "description": "群管理与权限",
+    "hint": "手动指令、分群权限、欢迎语、宵禁与群文件。AI 入群审核在主审核设置中配置。",
+    "items": {
+      "default": {
+        "description": "默认群配置",
+        "hint": "这些配置项会作为默认群模板使用。具体群开启“跟随默认配置”后，会直接继承这里的设置；关闭后则保存自己的独立配置。",
+        "obvious_hint": true,
+        "type": "object",
+        "items": {
+          "join_switch": {
+            "description": "进群审核",
+            "hint": "开启后，进群退群模块的功能才会在当前群聊生效，群主、群管理可用命令 “进群审核 开/关” 为当前群聊设置",
+            "type": "bool",
+            "default": false
+          },
+          "join_min_level": {
+            "description": "进群等级门槛",
+            "hint": "当申请人的QQ等级低于此值时，自动拒绝进群申请。设为0表示不启用此功能。可通过群内命令为当前群聊设置",
+            "type": "int",
+            "slider": {
+              "min": 0,
+              "max": 100,
+              "step": 1
+            },
+            "default": 8
+          },
+          "join_max_time": {
+            "description": "进群最大尝试次数",
+            "hint": "当用户申请进行的次数超过此值时，自动拒绝进群申请。可通过群内命令为当前群聊设置",
+            "type": "int",
+            "slider": {
+              "min": 0,
+              "max": 10,
+              "step": 1
+            },
+            "default": 0
+          },
+          "join_accept_words": {
+            "description": "进群白词",
+            "hint": "用户申请加群时, 若进群答案中包含这些关键词，则自动通过申请",
+            "type": "list",
+            "default": [
+              "白词1",
+              "白词2"
+            ]
+          },
+          "join_reject_words": {
+            "description": "进群黑词",
+            "hint": "用户申请加群时, 若进群答案中包含这些关键词，则自动拒绝申请",
+            "type": "list",
+            "default": [
+              "黑词1",
+              "黑词2"
+            ]
+          },
+          "join_no_match_reject": {
+            "description": "自动拒绝未命中白词的进群申请",
+            "hint": "当用户申请加群时，没命中进群关键词，则自动驳回申请",
+            "type": "bool",
+            "default": false
+          },
+          "reject_word_block": {
+            "description": "命中进群黑词自动拉黑",
+            "hint": "当用户因触发进群黑词而被拒绝进群时，自动拉黑该用户",
+            "type": "bool",
+            "default": false
+          },
+          "block_ids": {
+            "description": "进群黑名单",
+            "hint": "用户加入群聊时，若用户QQ在黑名单中，则自动拒绝",
+            "type": "list",
+            "default": []
+          },
+          "join_welcome": {
+            "description": "进群欢迎词",
+            "hint": "发给新群友的欢迎词, 支持变量: {nickname}, 示例：欢迎{nickname}加入群聊",
+            "type": "string",
+            "default": ""
+          },
+          "join_ban_time": {
+            "description": "进群禁言时长",
+            "hint": "单位为秒，新成员进群时，自动禁言该成员",
+            "type": "int",
+            "slider": {
+              "min": 0,
+              "max": 300,
+              "step": 10
+            },
+            "default": 0
+          },
+          "leave_notify": {
+            "description": "主动退群通知",
+            "hint": "当用户主动退群时，向群内通报",
+            "type": "bool",
+            "default": false
+          },
+          "leave_block": {
+            "description": "主动退群拉黑",
+            "hint": "当用户主动退群时，自动拉黑（即添加到进群黑名单）",
+            "type": "bool",
+            "default": false
+          },
+          "builtin_ban": {
+            "description": "启用内置禁词",
+            "hint": "插件内置了一个敏感词库, 如需自定义请自行修改：data/plugins/astrbot_plugin_qqadmin/SensitiveLexicon.json, 不建议开启，让群管理员通过命令“ 内置禁词 开/关 ”来为当前群聊设置",
+            "type": "bool",
+            "default": false
+          },
+          "custom_ban_words": {
+            "description": "群内自定义的违禁词",
+            "hint": "",
+            "type": "list",
+            "default": [
+              "禁词1",
+              "禁词2"
+            ]
+          },
+          "word_ban_time": {
+            "description": "触发禁词时的禁言时长",
+            "hint": "触发违禁词则禁言发送者，单位：秒，设置为 0 表示不禁言",
+            "type": "int",
+            "slider": {
+              "min": 0,
+              "max": 600,
+              "step": 60
+            },
+            "default": 360
+          },
+          "spamming_ban_time": {
+            "description": "刷屏禁言时长（秒）",
+            "hint": "当用户刷屏时触发禁言该用户，设置为 0 表示不启用此功能",
+            "type": "int",
+            "slider": {
+              "min": 0,
+              "max": 600,
+              "step": 60
+            },
+            "default": 0
+          }
+        }
+      },
+      "admin_audit": {
+        "description": "进群事件仅通知bot管理员",
+        "hint": "如果开启，则进群事件仅通知bot管理员，不再将通知发送在对应群聊",
         "type": "bool",
-        "default": false,
-        "hint": "使用本插件前必须阅读并同意免责声明，请点击阅读后勾选此项。免责声明地址：https://mianze.0n.pub"
-    },
-    "webui_dark_mode": {
-        "description": "WebUI 暗色模式",
-        "type": "bool",
-        "default": false,
-        "hint": "开启后 WebUI 管理面板使用暗色主题"
-    },
-    "enabled": {
-        "description": "插件总开关",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后插件不注入任何提示词，也不提供任何工具"
-    },
-    "prompt_injection_enabled": {
-        "description": "LLM 群管提示词注入开关",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后 LLM 不会收到群管工具的使用说明和权限规则"
-    },
-    "group_white_list": {
-        "description": "群白名单：只有列表中的群启用审核和群管功能；留空表示所有群启用",
-        "type": "list",
-        "default": [],
-        "invisible": true,
-        "hint": "设置后仅白名单群生效（审核/防刷屏/群管指令/多群配置均受限于白名单）。已迁移到 SQLite，请在 WebUI「设置-名单管理」或「群管理」中维护"
-    },
-    "group_black_list": {
-        "description": "群黑名单：列表中的群完全禁用本插件全部功能",
-        "type": "list",
-        "default": [],
-        "invisible": true,
-        "hint": "黑名单群不做审核、不响应群管指令。与白名单同时设置时黑名单优先。已迁移到 SQLite，请在 WebUI 中维护"
-    },
-    "user_black_list": {
-        "description": "用户黑名单：黑名单用户群内发言即被踢出+禁言，加群申请自动拒绝",
-        "type": "list",
-        "default": [],
-        "invisible": true,
-        "hint": "适合拉黑广告号/捣乱号。已迁移到 SQLite，请在 WebUI 中维护"
-    },
-    "user_white_list": {
-        "description": "用户白名单：白名单用户完全豁免内容审核与防刷屏检测",
-        "type": "list",
-        "default": [],
-        "invisible": true,
-        "hint": "适合豁免其他机器人账号或可信成员。已迁移到 SQLite，请在 WebUI 中维护"
-    },
-    "admin_list": {
-        "description": "管理员 QQ 号列表",
-        "type": "list",
-        "invisible": true,
-        "default": [],
-        "hint": "必须填写！列表中的 QQ 号才能使用管理指令和 LLM 群管工具。按发送者 ID 原样比对：非 QQ 号平台（如 QQ 官方机器人）需填写该平台的用户 ID，被拒时机器人回复中会给出"
-    },
-    "auto_moderate_enabled": {
-        "description": "自动审核总开关（检测骂人和广告自动撤回）",
-        "type": "bool",
-        "default": true,
-        "hint": "管理员可通过 /auto_moderate on/off 命令随时启停"
-    },
-    "ai_relay_mode_enabled": {
-        "description": "AI 中转特殊检测模式（高误伤风险）",
-        "type": "bool",
-        "default": false,
-        "invisible": true,
-        "hint": "严厉警告：仅供明确禁止相关数字内容的 AI 中转群使用，不是 AI 语义识别。默认关闭；必须先完成两项风险勾选并输入确认句才生效。可按群覆盖，但不能绕过全局风险确认。关闭全局模式会撤销风险确认；群黑白名单、用户白名单、自动审核总开关和管理员豁免仍生效。"
-    },
-    "ai_relay_zero_guard_enabled": {
-        "description": "AI 特殊版：0. / 前导零数字直接撤回",
-        "type": "bool",
-        "default": false,
-        "invisible": true,
-        "hint": "高误伤规则：原样匹配任意位置的 0.，以及独立的 0 开头三位/00 开头四位数字。0.0、0.2、10.5、100.0%、v1.0.1、012、0012 均可能命中！开启后直接撤回，不经 LLM 复核，不附加禁言/踢人。需要 AI 特殊模式与三项全局风险确认；可按群覆盖。"
-    },
-    "ai_relay_ack_recall": {
-        "description": "AI 特殊版风险确认 1/3：接受直接撤回",
-        "type": "bool",
-        "default": false,
-        "invisible": true,
-        "hint": "确认：匹配内容将直接撤回、不经 AI 复核，误撤回无法由插件自动恢复。建议在插件 WebUI 的 AI 特殊版页完成三步确认；此项是全局风险确认，不支持按群覆盖。"
-    },
-    "ai_relay_ack_false_positive": {
-        "description": "AI 特殊版风险确认 2/3：接受正常数字误伤",
-        "type": "bool",
-        "default": false,
-        "invisible": true,
-        "hint": "确认：正常价格、版本号、百分比、数字编号也可能误撤回，例如 10.5、v1.0.1、100.0%、012。不要在普通交流群启用；此项是全局风险确认，不支持按群覆盖。"
-    },
-    "ai_relay_risk_ack": {
-        "description": "AI 特殊版风险确认 3/3：输入确认句",
+        "default": false
+      },
+      "random_ban_time": {
+        "description": "随机禁言配置",
+        "hint": "若禁言命令未指定禁言时长，则使用随机时长，时长范围如下，单位为秒，用~表示范围",
         "type": "string",
-        "default": "",
-        "invisible": true,
-        "hint": "必须逐字输入：我确认启用AI特殊检测并承担误撤回风险。两项勾选与本确认句缺一不可；不是访问密钥。关闭全局模式会清空确认，重新开启需重新确认。"
-    },
-    "moderation_admin_exempt": {
-        "description": "管理员豁免消息内容审核",
-        "type": "bool",
-        "default": false,
-        "hint": "关闭时群主、群管理员和插件管理员也会进入消息内容审核，便于测试且避免管理员账号成为广告绕过通道；防刷屏仍始终豁免管理员。可按群覆盖"
-    },
-    "official_bot_exempt_enabled": {
-        "description": "豁免QQ开放平台机器人消息检测",
-        "type": "bool",
-        "default": false,
-        "hint": "开启后自动识别 QQ 开放平台（官方）机器人的消息并跳过内容审核与防刷屏。以协议端上报的 is_robot 标记为准（NapCat 支持），号段内的真实 QQ 号不会被误豁免；协议端不上报该标记时才退回按 288/388/389 虚拟号段识别，此时号段内的真实账号也会被豁免，必要时请关闭本开关改用用户白名单。可按群覆盖"
-    },
-    "moderation_require_bot_admin": {
-        "description": "机器人非管理员时跳过自动审核",
-        "type": "bool",
-        "default": true,
-        "hint": "机器人在某群只是普通成员时无法撤回或禁言，继续审核只会白耗 LLM 调用并干扰群聊。开启后确认机器人不是管理员/群主的群会跳过自动审核与防刷屏，并在日志中每小时提示一次；角色查询失败时不跳过。被设为管理员后立即恢复。可按群覆盖（Issue #89）"
-    },
-    "link_whitelist": {
-        "description": "链接白名单（允许的域名）",
-        "type": "list",
-        "default": [],
-        "hint": "指向这些域名的普通链接不再触发广告/违规网址等本地规则，也会告知 LLM 这些域名是允许的；消息其余内容照常审核。按主机名匹配并包含子域名：填 bilibili.com 可覆盖 www./m./space. 等全部子域，填 www.bilibili.com 则只放行该主机。用方框字、带圈字等伪装的链接不受白名单豁免（Issue #89）"
-    },
-    "auto_moderate_notice": {
-        "description": "撤回提示开关（撤回后是否在群内发说明消息）",
-        "type": "bool",
-        "default": true,
-        "hint": "开启后，消息被自动撤回/处罚时在群内发送提示（内容见 ban_notice 模板）。关闭则静默处理，不打扰群聊。统一管控三条撤回路径：规则命中撤回、LLM审核撤回、QQ收藏撤回"
-    },
-    "scan_swear": {
-        "description": "辱骂脏话检测开关",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后不使用正则匹配辱骂/脏话内容"
-    },
-    "scan_ad": {
-        "description": "广告推广检测开关",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后不使用正则匹配广告/推广/引流内容"
-    },
-    "custom_swear_keywords": {
-        "description": "自定义脏话关键词（追加到脏话检测规则）",
-        "type": "list",
-        "default": [],
-        "hint": "纯文本关键词，保存后即时并入 AC 自动机。也可用 /添加违禁词 脏话 <词> 指令添加（指令添加的存入规则库）"
-    },
-    "custom_ad_keywords": {
-        "description": "自定义广告关键词（追加到广告检测规则）",
-        "type": "list",
-        "default": [],
-        "hint": "纯文本关键词，保存后即时并入 AC 自动机。也可用 /添加违禁词 广告 <词> 指令添加"
-    },
-    "combine_detect_enabled": {
-        "description": "组合消息检测开关（防分段发送规避）",
-        "type": "bool",
-        "default": true,
-        "hint": "把违禁词拆成多条消息逐字发送（如 外/挂/进/群 四条消息）时，聚合该用户近期消息合并检测，命中则撤回全部涉及消息"
-    },
-    "combine_detect_count": {
-        "description": "组合检测聚合条数",
+        "default": "30~300"
+      },
+      "vote_ban": {
+        "description": "投票禁言配置",
+        "hint": "用于投票禁言",
+        "type": "object",
+        "items": {
+          "ttl": {
+            "description": "投票时长（秒）",
+            "hint": "每轮投票时长到达此值时，开始结算，赞同票多于反对票时，禁言生效",
+            "type": "int",
+            "slider": {
+              "min": 60,
+              "max": 300,
+              "step": 60
+            },
+            "default": 120
+          },
+          "threshold": {
+            "description": "投票通过所需票数",
+            "hint": "赞同禁言的投票数到达此值时，禁言直接生效",
+            "type": "int",
+            "slider": {
+              "min": 2,
+              "max": 10,
+              "step": 1
+            },
+            "default": 3
+          }
+        }
+      },
+      "llm_get_msg_count": {
+        "description": "取名指令获取消息的默认轮数",
+        "hint": "取名指令会爬取群聊的聊天记录进行分析，每轮爬200条消息，默认爬轮数10轮， 轮数可调",
         "type": "int",
-        "default": 5,
-        "hint": "聚合该用户最近多少条消息做合并检测，范围 2-20"
-    },
-    "combine_detect_window_seconds": {
-        "description": "组合检测时间窗口（秒）",
+        "slider": {
+          "min": 1,
+          "max": 40,
+          "step": 1
+        },
+        "default": 10
+      },
+      "level_threshold": {
+        "description": "高等级成员阈值设置",
+        "hint": "群等级高于此阈值的群成员，将被判定为“高等级成员”",
         "type": "int",
-        "default": 60,
-        "hint": "只聚合该窗口内的消息，范围 5-600 秒"
-    },
-    "llm_moderation_enabled": {
-        "description": "LLM 二次审核开关",
-        "type": "bool",
-        "default": true,
-        "hint": "开启后，规则候选、同一发送者近期多条组合及已启用 OCR/二维码识别的图片文本会由 LLM 结合上下文确认；关闭则按本地规则处理"
-    },
-    "llm_moderation_always": {
-        "description": "普通消息全量 AI 审核",
-        "type": "bool",
-        "default": false,
-        "hint": "开启后所有可审核消息均送 LLM，并拉取群聊历史和同一发送者分段上下文；图片/表情包会自动尝试 OCR 与二维码解析。会显著增加调用量，可按群覆盖"
-    },
-    "base_decode_enabled": {
-        "description": "Base 系列编码内容解码审核",
-        "type": "bool",
-        "default": true,
-        "hint": "自动识别并受限解码 Base16/32/58/62/64/Base64URL/85（含双层编码），把可读结果送入现有规则、上下文和 LLM 审核。随机字符串不会因仅能解码而直接处罚；可按群覆盖"
-    },
-    "llm_max_concurrency": {
-        "description": "LLM 全局最大并发",
-        "type": "int",
-        "default": 12,
-        "hint": "消息、OCR、入群和名片审核共享的并发上限，范围 1-32；修改后需重载插件。OCR 内部最多占 4 路，避免阻塞正文审核"
-    },
-    "llm_moderation_ban": {
-        "description": "LLM 审核违规后自动禁言",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后 LLM 判定违规只撤回不禁言"
-    },
-    "moderation_ban_duration": {
-        "description": "自动审核禁言时长（秒）",
-        "type": "int",
-        "default": 1800,
-        "hint": "自动审核触发违规后的禁言时长，单位秒，默认 1800 秒（30分钟）"
-    },
-    "moderation_llm_provider_id": {
-        "description": "审核使用的 LLM Provider",
-        "type": "string",
-        "_special": "select_provider",
-        "default": "",
-        "hint": "留空则自动使用第一个可用的 LLM Provider 做审核"
-    },
-    "ban_notice": {
-        "description": "封禁通知模板",
-        "type": "string",
-        "default": "[群管] {name}({uid}) 的消息已被撤回（违规内容）",
-        "hint": "支持变量：{name} 用户名、{uid} QQ号、{group} 群号、{reason} 违规原因"
-    },
-    "ban_enabled": {
-        "description": "禁言功能开关",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后 /禁言 指令和 LLM 禁言工具均不可用"
-    },
-    "unban_enabled": {
-        "description": "解除禁言功能开关",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后 /解禁 指令和 LLM 解禁工具均不可用"
-    },
-    "kick_enabled": {
-        "description": "踢人功能开关",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后 /踢人 指令和 LLM 踢人工具均不可用"
-    },
-    "set_admin_require_owner": {
-        "description": "严格模式：设置/取消管理员仅群主可用",
-        "type": "bool",
-        "default": false,
-        "hint": "开启后 /设置管理 /取消管理 及对应 LLM 工具只认本群群主，插件全局管理员也不例外（Issue #35）"
-    },
-    "llm_moderation_custom_prompt": {
-        "description": "自定义 LLM 审核标准（留空用内置）",
-        "type": "text",
-        "default": "",
-        "hint": "填写后替换内置的审核标准段落（如嫌默认标准太激进可自行放宽）。JSON 输出格式约束由框架自动追加，无需自己写。可按群覆盖（Issue #39）"
-    },
-    "moderation_review_enabled": {
-        "description": "误判样本定期复盘",
-        "type": "bool",
-        "default": false,
-        "hint": "开启后定期用 LLM 复盘管理员标记的误判样本，只生成待确认的修正规则候选，不会自动修改审核提示词"
-    },
-    "moderation_review_interval": {
-        "description": "误判复盘间隔（秒）",
-        "type": "int",
-        "default": 86400,
-        "hint": "自动复盘间隔，范围 300-604800 秒；也可在违规记录页手动立即复盘"
-    },
-    "moderation_review_min_samples": {
-        "description": "自动复盘最少误判样本数",
-        "type": "int",
-        "default": 3,
-        "hint": "待复盘误判达到该数量才自动调用 LLM，范围 1-20；手动复盘只需 1 条"
-    },
-    "llm_moderation_review_guidance": {
-        "description": "已应用的误判修正规则",
-        "type": "text",
-        "default": "",
-        "hint": "由误判复盘候选经管理员确认后写入，作为内置或自定义审核标准的补充；可在复盘记录中回滚"
-    },
-    "member_action_require_group_role": {
-        "description": "严格模式：群管指令仅群主/群管理员可用",
-        "type": "bool",
-        "default": false,
-        "hint": "开启后 /禁言 /踢人 /设置名片 等群管指令要求操作者本群角色为群主或群管理员，即使是插件全局管理员在其非群管的群里也不能通过指令操作（防止跨群乱踢人）。查询指令与 WebUI 远程执行不受此限制"
-    },
-    "kick_recall_enabled": {
-        "description": "踢人时自动撤回该成员最近消息",
-        "type": "bool",
-        "default": false,
-        "hint": "开启后踢人时自动撤回该成员最近的消息，条数由下方配置控制"
-    },
-    "kick_recall_count": {
-        "description": "踢人撤回消息条数",
-        "type": "int",
-        "default": 10,
-        "hint": "踢人时自动撤回该成员最近的消息条数，范围 1-50"
-    },
-    "whole_ban_enabled": {
-        "description": "全体禁言功能开关",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后 /全体禁言 指令和 LLM 工具均不可用"
-    },
-    "set_card_enabled": {
-        "description": "修改群名片功能开关",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后 /设置名片 指令和 LLM 工具均不可用"
-    },
-    "send_announcement_enabled": {
-        "description": "发送群公告功能开关",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后 /发公告 指令和 LLM 工具均不可用"
-    },
-    "delete_announcement_enabled": {
-        "description": "删除群公告功能开关",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后 /删公告 指令和 LLM 工具均不可用"
-    },
-    "list_announcements_enabled": {
-        "description": "查看群公告列表功能开关",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后 /公告列表 指令均不可用"
-    },
-    "member_list_enabled": {
-        "description": "查看群成员列表功能开关",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后 /成员列表 和 /搜索成员 指令均不可用"
-    },
-    "set_admin_enabled": {
-        "description": "设置群管理员功能开关",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后 /设置管理 指令和 LLM 工具均不可用"
-    },
-    "set_group_name_enabled": {
-        "description": "修改群名称功能开关",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后 /群名 指令和 LLM 工具均不可用"
-    },
-    "set_title_enabled": {
-        "description": "设置专属头衔功能开关",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后 /头衔 指令和 LLM 工具均不可用"
-    },
-    "banned_list_enabled": {
-        "description": "查看禁言列表功能开关",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后 /禁言列表 指令和 LLM 工具均不可用"
-    },
-    "join_verify_enabled": {
-        "description": "设置加群方式功能开关",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后 /加群方式 指令和 LLM 工具均不可用"
-    },
-    "recall_enabled": {
-        "description": "撤回消息功能开关",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后 /撤回最新消息 和 /批量撤回 指令均不可用（自动审核的撤回不受此控制）"
-    },
-    "essence_enabled": {
-        "description": "精华消息功能开关",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后 /设精华 和 /取消精华 指令和 LLM 工具均不可用"
-    },
-    "group_files_enabled": {
-        "description": "群文件管理功能开关",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后群文件查看/上传/删除/移动/重命名等全部不可用"
-    },
-    "group_honor_enabled": {
-        "description": "群荣誉查看功能开关",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后群荣誉查看 LLM 工具不可用"
-    },
-    "at_all_remain_enabled": {
-        "description": "@全体成员剩余次数查询开关",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后 @全体成员剩余次数查询 LLM 工具不可用"
-    },
-    "ignore_requests_enabled": {
-        "description": "被忽略加群请求查看开关",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后被忽略加群请求查看 LLM 工具不可用"
-    },
-    "group_msg_history_enabled": {
-        "description": "群消息历史查看开关",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后群消息历史查看 LLM 工具不可用"
-    },
-    "group_portrait_enabled": {
-        "description": "群头像设置功能开关",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后群头像设置 LLM 工具不可用"
-    },
-    "group_sign_enabled": {
-        "description": "群打卡功能开关",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后群打卡 LLM 工具不可用"
-    },
-    "anti_flood_enabled": {
-        "description": "防刷屏总开关",
-        "type": "bool",
-        "default": true,
-        "hint": "开启后自动检测并处理刷屏行为。按滑动窗口统计最近1秒/60秒/3600秒内的消息数，不按自然日累计；所有消息类型均计入，包括转发、QQ收藏、图片等"
-    },
-    "anti_flood_rate_per_second": {
-        "description": "最近1秒消息上限（0=关闭本项检测）",
-        "type": "int",
-        "default": 5,
-        "hint": "用户最近1秒消息数超过此值判定为刷屏。填写5表示第6条触发；设为0可关闭本档"
-    },
-    "anti_flood_rate_per_minute": {
-        "description": "最近1分钟消息上限（0=关闭本项检测）",
-        "type": "int",
-        "default": 20,
-        "hint": "用户最近60秒消息数超过此值判定为刷屏。填写20表示第21条触发；设为0可关闭本档"
-    },
-    "anti_flood_rate_per_hour": {
-        "description": "最近1小时消息上限（0=关闭本项检测）",
-        "type": "int",
-        "default": 60,
-        "hint": "用户最近3600秒消息数超过此值判定为刷屏，不按自然小时或当天累计；设为0可关闭本档"
-    },
-    "anti_flood_night_enabled": {
-        "description": "凌晨/夜间独立限速开关",
-        "type": "bool",
-        "default": false,
-        "hint": "开启后在指定夜间时段使用单独的每秒/每分钟/每小时消息上限。适合凌晨低活跃时段收紧刷屏阈值"
-    },
-    "anti_flood_night_start_hour": {
-        "description": "夜间限速开始小时（0-23）",
-        "type": "int",
-        "default": 0,
-        "hint": "按服务器本地时间判断。0 表示 00:00；支持跨天区间，如 23 到 6 表示 23:00-次日06:00"
-    },
-    "anti_flood_night_end_hour": {
-        "description": "夜间限速结束小时（0-23）",
-        "type": "int",
-        "default": 6,
-        "hint": "按服务器本地时间判断。开始小时与结束小时相同表示全天使用夜间阈值"
-    },
-    "anti_flood_night_rate_per_second": {
-        "description": "夜间最近1秒消息上限（0=关闭本项检测）",
-        "type": "int",
-        "default": 3,
-        "hint": "夜间时段用户最近1秒消息数超过此值判定为刷屏"
-    },
-    "anti_flood_night_rate_per_minute": {
-        "description": "夜间最近1分钟消息上限（0=关闭本项检测）",
-        "type": "int",
-        "default": 10,
-        "hint": "夜间时段用户最近60秒消息数超过此值判定为刷屏"
-    },
-    "anti_flood_night_rate_per_hour": {
-        "description": "夜间最近1小时消息上限（0=关闭本项检测）",
-        "type": "int",
-        "default": 30,
-        "hint": "夜间时段用户最近3600秒消息数超过此值判定为刷屏，不按当天累计"
-    },
-    "anti_flood_mute_duration": {
-        "description": "刷屏禁言时长（秒，0=仅撤回不禁言）",
-        "type": "int",
-        "default": 300,
-        "hint": "检测到刷屏后自动禁言多少秒，设为 0 则只撤回不禁言。默认300秒（5分钟）"
-    },
-    "anti_flood_recall_enabled": {
-        "description": "刷屏消息自动撤回开关",
-        "type": "bool",
-        "default": true,
-        "hint": "开启后刷屏消息会被自动撤回；关闭则只禁言不撤回"
-    },
-    "anti_flood_recall_threshold": {
-        "description": "撤回阈值（条数）",
-        "type": "int",
-        "default": 20,
-        "hint": "刷屏消息数超过此值才进行批量撤回，防止少量超限就被撤回，默认20条"
-    },
-    "repeat_detect_enabled": {
-        "description": "重复消息检测开关",
-        "type": "bool",
-        "default": true,
-        "hint": "开启后检测短时间内重复发送相同内容的刷屏行为"
-    },
-    "repeat_detect_window_seconds": {
-        "description": "重复消息检测窗口（秒）",
-        "type": "int",
-        "default": 120,
-        "hint": "在最近 N 秒内统计同一内容重复次数，默认120秒，最大3600秒；不按当天累计，设0关闭"
-    },
-    "repeat_detect_count": {
-        "description": "重复消息触发次数",
-        "type": "int",
-        "default": 3,
-        "hint": "同一内容在检测窗口内达到该次数即触发处理，默认第3次触发；中间夹其他消息也会计数"
-    },
-    "long_text_detect_enabled": {
-        "description": "长文本刷屏检测开关",
-        "type": "bool",
-        "default": true,
-        "hint": "开启后检测超长消息，防止通过大段文本刷屏"
-    },
-    "long_text_threshold": {
-        "description": "长文本长度阈值（字符）",
-        "type": "int",
-        "default": 500,
-        "hint": "单条消息长度超过该值触发处理；设 0 关闭"
-    },
-    "lexicon_political_enabled": {
-        "description": "外置词库-政治敏感类检测",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后不检测政治敏感关键词"
-    },
-    "lexicon_porn_enabled": {
-        "description": "外置词库-色情淫秽类检测",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后不检测色情淫秽关键词"
-    },
-    "lexicon_violent_enabled": {
-        "description": "外置词库-暴恐内容类检测",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后不检测暴恐内容关键词"
-    },
-    "lexicon_reactionary_enabled": {
-        "description": "外置词库-反动言论类检测",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后不检测反动言论关键词"
-    },
-    "lexicon_weapons_enabled": {
-        "description": "外置词库-涉枪涉爆类检测",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后不检测涉枪涉爆关键词"
-    },
-    "lexicon_corruption_enabled": {
-        "description": "外置词库-贪腐相关类检测",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后不检测贪腐相关关键词"
-    },
-    "lexicon_illegal_url_enabled": {
-        "description": "外置词库-违规网址类检测",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后不检测违规网址（仅匹配词库中的网址）"
-    },
-    "lexicon_other_enabled": {
-        "description": "外置词库-其他违规类检测",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后不检测补充词库、民生敏感、腾讯封禁等其他类别"
-    },
-    "scan_forward_msg": {
-        "description": "合并转发消息审核开关",
-        "type": "bool",
-        "default": true,
-        "hint": "开启后会解析合并转发消息内容进行审核"
-    },
-    "ocr_enabled": {
-        "description": "OCR识图审核开关",
-        "type": "bool",
-        "default": false,
-        "hint": "开启后会使用LLM视觉模型识别图片内容进行审核，需要配置支持视觉的LLM"
-    },
-    "ocr_provider_id": {
-        "description": "OCR使用的视觉LLM Provider（可选）",
-        "type": "string",
-        "_special": "select_provider",
-        "default": "",
-        "hint": "选择支持视觉/图片理解的 Provider；留空时依次回退到审核 Provider 和 AstrBot 当前默认 Provider"
-    },
-    "ocr_prompt_template": {
-        "description": "OCR提示词模板",
-        "type": "string",
-        "default": "default",
-        "options": [
-            "default",
-            "strict",
-            "text_only"
-        ],
-        "hint": "default=通用识别、strict=严格审核、text_only=纯文字转录；填写自定义提示词后此项无效"
-    },
-    "ocr_custom_system_prompt": {
-        "description": "OCR自定义系统提示词",
-        "type": "text",
-        "default": "",
-        "hint": "留空使用模板提示词；填写后将覆盖模板的system_prompt（需同时填写用户提示词）"
-    },
-    "ocr_custom_user_prompt": {
-        "description": "OCR自定义用户提示词",
-        "type": "text",
-        "default": "",
-        "hint": "留空使用模板提示词；填写后将覆盖模板的user_prompt（需同时填写系统提示词）"
-    },
-    "recall_qq_favorite_enabled": {
-        "description": "QQ收藏内容自动撤回开关",
-        "type": "bool",
-        "default": true,
-        "hint": "开启后检测到QQ收藏转发的消息会自动撤回"
-    },
-    "scan_sticker_enabled": {
-        "description": "表情包/商城表情审核开关",
-        "type": "bool",
-        "default": true,
-        "hint": "开启后会通过OCR识别商城表情图片内容进行审核（需同时开启OCR）"
-    },
-    "qrcode_decode_enabled": {
-        "description": "二维码解码审核开关",
-        "type": "bool",
-        "default": false,
-        "hint": "开启后精确解码图片/表情包中的二维码，把二维码里的URL/文本注入审核管线（拦截扫码进群/加好友引流）。解码库(opencv)已随插件默认安装，直接开启即可，无需额外配置视觉模型。注意：开启后每条图片消息都会下载并解码，繁忙群聊有一定网络/CPU开销"
-    },
-    "word_count_enabled": {
-        "description": "字数统计功能开关",
-        "type": "bool",
-        "default": false,
-        "hint": "开启后允许使用 /字数统计 查询最近群消息中的关键词出现次数"
-    },
-    "group_stats_enabled": {
-        "description": "群统计功能开关",
-        "type": "bool",
-        "default": true,
-        "hint": "开启后允许使用 /群统计 查看群成员数量与管理员统计"
-    },
-    "join_audit_enabled": {
-        "description": "入群自动审核开关（F1）",
-        "type": "bool",
-        "default": false,
-        "hint": "开启后自动处理加群申请：显式拒绝词优先，通过词可放行；违禁词库候选在未开启入群 LLM 时直接拒绝，开启后交由 LLM 二审；其余按默认动作"
-    },
-    "join_audit_notify": {
-        "description": "入群审核结果群内通知",
-        "type": "bool",
-        "default": true,
-        "hint": "开启后自动审核通过/拒绝时在群内发送通知消息"
-    },
-    "join_accept_keywords": {
-        "description": "入群-自动通过关键词",
-        "type": "list",
-        "default": [],
-        "hint": "申请验证消息命中任一关键词即自动通过（按群细化请用 WebUI 规则）。默认为包含匹配；以 = 开头为精确匹配，如 =原神 要求答案恰好是「原神」"
-    },
-    "join_reject_keywords": {
-        "description": "入群-自动拒绝关键词",
-        "type": "list",
-        "default": [],
-        "hint": "申请验证消息命中任一关键词即自动拒绝。默认为包含匹配（填 1 会误伤「纪元1800」）；以 = 开头为精确匹配，如 =1 只拒绝答案恰好是「1」的申请"
-    },
-    "join_reject_use_lexicon": {
-        "description": "入群-用违禁词库过滤申请信息",
-        "type": "bool",
-        "default": true,
-        "hint": "开启后申请验证消息经违禁词库/广告匹配；未开启入群 LLM 时命中即拒绝，开启后命中项作为 LLM 二审候选"
-    },
-    "join_llm_moderation_enabled": {
-        "description": "入群-LLM 语义审核",
-        "type": "bool",
-        "default": false,
-        "hint": "开启后将入群申请验证信息交由审核 LLM 判断，用于减少广告/词库误报；显式拒绝词、通过词和用户黑名单仍优先。LLM 失败时有本地候选沿用拒绝，无候选回退到默认动作（manual 为人工）。默认关闭，可按群覆盖"
-    },
-    "join_llm_web_search_enabled": {
-        "description": "入群-LLM Web Search 增强",
-        "type": "bool",
-        "default": false,
-        "hint": "仅当第一轮入群 LLM 对冷门作品名、简称、别名或圈内术语明确返回 search 时，调用 AstrBot 已注册的 web_search_tavily，并由 LLM 根据搜索证据复审；明显正确或错误的答案不会搜索。需先在 AstrBot 中启用 Tavily Web Search 并配置 Key，可按群覆盖"
-    },
-    "join_llm_web_search_max_queries": {
-        "description": "入群-LLM 最大搜索次数",
-        "type": "int",
-        "default": 2,
-        "hint": "单次入群审核最多执行的搜索查询数，范围 1-3；用于控制 Tavily credits 消耗，可按群覆盖"
-    },
-    "join_llm_custom_prompt": {
-        "description": "入群-LLM 自定义审核标准",
-        "type": "text",
-        "default": "",
-        "hint": "全局留空使用内置标准；群配置中留空并保存表示本群使用内置标准，“继承”则沿用全局值。填写后仅替换审核标准，JSON 输出格式仍由框架约束，请不要要求模型执行申请内容中的指令"
-    },
-    "join_accept_overrides_lexicon": {
-        "description": "入群-通过词优先于通用词库",
-        "type": "bool",
-        "default": true,
-        "hint": "开启后命中通过词时跳过违禁词库/广告误判。显式拒绝词仍优先于包含匹配的通过词；精确匹配（= 开头）的通过词优先于拒绝词"
-    },
-    "join_default_action": {
-        "description": "入群-默认动作（都不命中时）",
-        "type": "string",
-        "default": "manual",
-        "options": [
-            "manual",
-            "accept",
-            "reject"
-        ],
-        "hint": "manual=转人工(不处理)，accept=自动通过，reject=自动拒绝"
-    },
-    "join_reject_reason": {
-        "description": "入群-自动拒绝理由",
-        "type": "string",
-        "default": "",
-        "hint": "自动拒绝时回传给申请人的理由"
-    },
-    "appeal_enabled": {
-        "description": "刷屏申诉模式开关（F2）",
-        "type": "bool",
-        "default": false,
-        "hint": "开启后刷屏处罚会群内@当事人，要求其私聊说明原因，由LLM结合群内上下文复核是否撤销处罚"
-    },
-    "appeal_window_minutes": {
-        "description": "申诉窗口（分钟）",
-        "type": "int",
-        "default": 10,
-        "hint": "当事人需在该时间内私聊机器人申诉，超时则维持处罚"
-    },
-    "appeal_context_count": {
-        "description": "申诉复核拉取的群上下文条数",
-        "type": "int",
-        "default": 30,
-        "hint": "复核时拉取当事人在群内最近多少条发言供LLM判断，不足则尽量取"
-    },
-    "appeal_at_template": {
-        "description": "申诉@公示模板",
-        "type": "text",
-        "default": "",
-        "hint": "群内@当事人的提示文案，支持 {name} 昵称、{minutes} 申诉窗口分钟数；留空用默认文案"
-    },
-    "auto_unban_enabled": {
-        "description": "定时自动解禁开关（F3）",
-        "type": "bool",
-        "default": false,
-        "hint": "开启后插件发起的禁言会登记到期解禁，后台任务到点自动解除（重启不丢）。OneBot本身到期会解禁，本功能主要用于永久禁言托管与重启补解禁"
-    },
-    "auto_unban_scan_interval": {
-        "description": "定时解禁扫描间隔（秒）",
-        "type": "int",
-        "default": 60,
-        "hint": "后台任务多久扫描一次到期解禁，范围 10-3600 秒"
-    },
-    "auto_unban_permanent_hours": {
-        "description": "永久禁言托管解禁时长（小时）",
-        "type": "int",
-        "default": 168,
-        "hint": "对永久禁言(时长0)登记的兜底解禁时长，默认168小时(7天)"
-    },
-    "group_admin_grant_enabled": {
-        "description": "群管理员动态授权总开关（F5）",
-        "type": "bool",
-        "default": false,
-        "hint": "开启后，在已配置授权且被允许（白名单内）的群里，群主/群管理员自动获得【本群】群管操作权限（非插件全局管理员），被下管理后最多10秒内失效。按群授权请用 /群管理授权 或 WebUI"
-    },
-    "legacy_role_admin_enabled": {
-        "description": "兼容：群主/管理员默认拥有本群群管操作权限",
-        "type": "bool",
-        "default": true,
-        "hint": "保持历史行为：白名单内（或未设白名单且非黑名单）群的群主/管理员默认可用群管命令（仅本群，非插件全局管理员）。若只想用F5按群精细授权，可关闭此项"
-    },
-    "card_monitor_enabled": {
-        "description": "名片监控总开关",
-        "type": "bool",
-        "default": false,
-        "hint": "开启后处理入群即时检查、群成员名片变更、周期同步兜底及管理员任免通知；事件能力取决于协议端，周期同步使用群成员列表查询。默认关闭，请在 WebUI「名片监控」页配置各子功能"
-    },
-    "card_sync_enabled": {
-        "description": "名片周期同步兜底",
-        "type": "bool",
-        "default": true,
-        "hint": "开启后按间隔查询群成员名片，弥补协议端不发送 group_card 通知导致的漏检；仅在名片监控总开关开启时生效"
-    },
-    "card_sync_interval": {
-        "description": "名片同步间隔（秒）",
-        "type": "int",
-        "default": 120,
-        "hint": "低频查询群成员名片的间隔，可设 30-3600 秒；普通成员首次同步只建立基线，保护名单成员若偏离预设名片会立即还原"
-    },
-    "card_log_enabled": {
-        "description": "名片变更/管理员任免记日志",
-        "type": "bool",
-        "default": true,
-        "hint": "记录所有名片变更（谁的名片、旧→新、时间）和管理员任免事件到「名片监控」页。注意：协议不上报操作者，无法区分本人改还是管理员改"
-    },
-    "card_monitor_notify": {
-        "description": "名片还原时群内通知",
-        "type": "bool",
-        "default": true,
-        "hint": "触发名片保护还原/违规名片还原时在群内发送通知消息"
-    },
-    "card_protect_enabled": {
-        "description": "名片保护/还原",
-        "type": "bool",
-        "default": false,
-        "hint": "开启后，保护名单内成员的名片被改动会自动改回预设名片。保护名单在 WebUI「名片监控」页维护"
-    },
-    "card_audit_link_only": {
-        "description": "名片仅拦链接/店铺（宽松）",
-        "type": "bool",
-        "default": false,
-        "hint": "只拦截含网址链接/二维码/店铺域名的名片，允许引流缩写、联系方式暗示（如 xxxrxxx）等自定义昵称。命中即还原为旧名片"
-    },
-    "card_audit_enabled": {
-        "description": "违规名片全量审核",
-        "type": "bool",
-        "default": false,
-        "hint": "开启后名片经词库/正则初筛+LLM上下文判断（同消息审核），拦引流/辱骂/违禁词等并还原。与「仅拦链接」同时开启时以本项严格模式为准"
-    },
-    "card_audit_admin_exempt": {
-        "description": "管理员豁免违规名片审核",
-        "type": "bool",
-        "default": true,
-        "hint": "开启后群主、群管理员和插件管理员跳过违规名片审核；名片变更日志仍记录，名片保护名单的强制还原仍会执行。可按群覆盖"
-    },
-    "card_audit_llm_always": {
-        "description": "名片强制全量送LLM判断",
-        "type": "bool",
-        "default": false,
-        "hint": "开启后即使初筛未命中也把每个名片送LLM判断，用于识别 ldxp/catfk 这类无规律引流缩写黑话（成本高，仅在「违规名片全量审核」开启时生效）"
-    },
-    "admin_change_notify_enabled": {
-        "description": "管理员任免群内通知",
-        "type": "bool",
-        "default": false,
-        "hint": "开启后，有人被设为/被取消群管理员时在群内发送通知（协议不含操作者，只报被任免者）"
-    },
-    "recall_reply_notice": {
-        "description": "「/回复撤回」成功后回复确认消息",
-        "type": "bool",
-        "default": true,
-        "hint": "关闭后 /回复撤回 撤回成功时静默处理，不再回复「已撤回被引用的消息」（Issue #44）。撤回失败的错误提示不受影响，仍会提示"
-    },
-    "moderation_llm_fail_closed": {
-        "description": "LLM 不可用时严格拦截（fail-closed）",
-        "type": "bool",
-        "default": false,
-        "hint": "默认关：LLM 全部不可用时，除超长内容和高置信度脏话外的命中会放行，避免 Provider 抖动导致误封。开启后，只要命中任一规则/词库类别，LLM 降级时也一律按规则处罚"
-    },
-    "lexicon_learn_enabled": {
-        "description": "自适应上下文学习总开关",
-        "type": "bool",
-        "default": false,
-        "hint": "开启后 AI 定期从群聊上下文挖掘本群特有的引流/广告黑话（如 AI中转、plus日抛team），沉淀为按群独立的候选词。默认关闭；候选词需在 WebUI「词库学习」页审批后才生效。可按群覆盖"
-    },
-    "lexicon_learn_interval": {
-        "description": "上下文学习挖掘间隔（秒）",
-        "type": "int",
-        "default": 300,
-        "hint": "多久从群聊缓冲挖掘一次候选词，范围 30-3600 秒。间隔越短越及时但 LLM 调用越多；示例值 300（5分钟）"
-    },
-    "lexicon_learn_auto_apply": {
-        "description": "自动生效学习词（多维度自动审批）",
-        "type": "bool",
-        "default": false,
-        "hint": "开启后候选词经【多维度自动审批门】（置信度+出现频次+词形+非常用词+对抗式LLM复核）全部通过即【不经人工】自动生效并参与撤回判断；任一维度不过则转人工。默认关，开启前建议先在候选列表观察学习质量"
-    },
-    "lexicon_learn_verify_llm": {
-        "description": "自动审批的对抗式LLM复核",
-        "type": "bool",
-        "default": true,
-        "hint": "自动生效前额外用一次 LLM【反驳复核】该词是否会误伤正常消息，从严判定；关闭会加快自动生效但显著提高误封风险。仅在「自动生效学习词」开启时生效"
-    },
-    "lexicon_learn_min_occurrences": {
-        "description": "学习词自动生效所需出现次数",
-        "type": "int",
-        "default": 3,
-        "hint": "同一候选词需跨轮累计出现达到该次数才允许自动生效（仅在自动生效开启时约束），范围 1-100。人工审批不受此限"
-    },
-    "lexicon_learn_min_confidence": {
-        "description": "学习词自动生效置信度阈值",
-        "type": "float",
-        "default": 0.75,
-        "hint": "LLM 对候选词的置信度需≥该值才允许自动生效，范围 0-1（仅在自动生效开启时约束）"
-    },
-    "lexicon_learn_min_length": {
-        "description": "学习词最小长度",
-        "type": "int",
-        "default": 2,
-        "hint": "低于该长度的候选词直接丢弃，避免把单字/超短常用词学成违禁词，范围 2-20"
-    },
-    "lexicon_learn_max_per_run": {
-        "description": "单轮单群最多接纳候选数",
-        "type": "int",
-        "default": 10,
-        "hint": "每次挖掘每个群最多接纳多少个候选词，防止一次性灌入过多，范围 1-50"
-    },
-    "lexicon_learn_sample_size": {
-        "description": "每次挖掘的消息样本数",
-        "type": "int",
-        "default": 60,
-        "hint": "每次从群聊缓冲取最近多少条消息喂给学习模型，范围 15-300。越大越全面但单次 LLM 开销越高"
-    },
-    "lexicon_learn_provider_id": {
-        "description": "上下文学习使用的模型",
-        "type": "string",
-        "_special": "select_provider",
-        "default": "",
-        "hint": "留空则复用审核模型/首个可用 Provider。可单独指定一个便宜的模型做词库学习，降低成本"
-    },
-    "lexicon_learn_allowlist": {
-        "description": "学习白名单（永不学习的词）",
-        "type": "list",
-        "default": [],
-        "hint": "列在此处的词永远不会被学成违禁词，用于保护本群常用词/正常商品名，避免误伤"
-    },
-    "moderation_require_ai_confirmation": {
-        "description": "自动处罚必须经过AI确认",
-        "type": "bool",
-        "default": false,
-        "hint": "开启后，超长消息和伪装链接也先交AI判断；AI异常时不撤回、不禁言。可按群覆盖。"
-    },
-    "join_empty_auto_accept": {
-        "description": "空白入群申请自动通过",
-        "type": "bool",
-        "default": false,
-        "hint": "仍须通过QQ等级门槛；不会绕过黑名单和拒绝规则。"
-    },
-    "join_min_qq_level": {
-        "description": "自动通过要求的最低QQ等级",
-        "type": "int",
-        "default": 0,
-        "hint": "0关闭。等级隐藏、未知或查询失败时转人工，不自动放行。"
-    },
-    "moderation_notify_private_enabled": {
-        "description": "违规处理后私聊通知管理员",
-        "type": "bool",
-        "default": false,
-        "hint": "发送群号、违规用户QQ、处理结果和消息摘要，是否踢人由管理员决定。"
-    },
-    "moderation_notify_admin_id": {
-        "description": "违规私聊通知接收QQ",
-        "type": "string",
-        "default": "",
-        "hint": "只通知这个账号，不向所有管理员群发。"
-    },
-    "moderation_notify_at_fallback": {
-        "description": "私聊失败时在群内@通知接收者",
-        "type": "bool",
-        "default": true,
-        "hint": "群内只发送简短提醒，不重复广告原文。"
+        "slider": {
+          "min": 1,
+          "max": 100,
+          "step": 1
+        },
+        "default": 50
+      },
+      "perms": {
+        "description": "指令权限管理",
+        "hint": "设置各个命令的使用权限",
+        "type": "object",
+        "items": {
+          "set_config": {
+            "description": "群管配置",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "管理员"
+          },
+          "reset_config": {
+            "description": "群管重置",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "管理员"
+          },
+          "set_group_ban": {
+            "description": "禁言",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "管理员"
+          },
+          "cancel_group_ban": {
+            "description": "解禁",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "管理员"
+          },
+          "whole_ban": {
+            "description": "全体禁言相关指令",
+            "hint": "包括：开启全禁、关闭全禁",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "管理员"
+          },
+          "set_group_card": {
+            "description": "改名",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "管理员"
+          },
+          "set_group_special_title": {
+            "description": "头衔",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "管理员"
+          },
+          "set_group_special_title_me": {
+            "description": "申请头衔",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "成员"
+          },
+          "set_group_kick": {
+            "description": "踢了",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "管理员"
+          },
+          "set_group_block": {
+            "description": "拉黑",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "管理员"
+          },
+          "admin": {
+            "description": "设置管理员指令",
+            "hint": "包括：上管、下管",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "群主"
+          },
+          "essence": {
+            "description": "操作群精华指令",
+            "hint": "包括：设精、移精",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "成员"
+          },
+          "get_essence_msg_list": {
+            "description": "群精华",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "成员"
+          },
+          "delete_msg": {
+            "description": "撤回",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "成员"
+          },
+          "send_group_notice": {
+            "description": "发布群公告",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "管理员"
+          },
+          "get_group_notice": {
+            "description": "查看群公告",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "成员"
+          },
+          "set_group_portrait": {
+            "description": "设置群头像",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "管理员"
+          },
+          "set_group_name": {
+            "description": "设置群名",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "管理员"
+          },
+          "word_ban": {
+            "description": "禁词指令",
+            "hint": "包括：禁词禁言 <时长>、设置禁词、内置禁词 <开 | 关>",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "管理员"
+          },
+          "handle_builtin_ban_words": {
+            "description": "刷屏禁言指令",
+            "hint": "包括：刷屏禁言",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "管理员"
+          },
+          "vote": {
+            "description": "投票禁言指令",
+            "hint": "包括 投票禁言、赞同禁言、反对禁言",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "成员"
+          },
+          "curfew": {
+            "description": "宵禁指令",
+            "hint": "包括开启宵禁、关闭宵禁",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "管理员"
+          },
+          "join": {
+            "description": "进群审核指令",
+            "hint": "进群审核相关功能包括：进群审核开关、进群白词、进群黑词、进群等级、进群尝试次数、未命中白词自动拒绝、命中黑词拉黑、进群黑名单",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "管理员"
+          },
+          "approve": {
+            "description": "批准/驳回（进群申请）",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "管理员"
+          },
+          "welcome": {
+            "description": "进群欢迎与禁言",
+            "hint": "",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "管理员"
+          },
+          "leave": {
+            "description": "退群通知与拉黑",
+            "hint": "",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "管理员"
+          },
+          "get_group_member_list": {
+            "description": "群友信息",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "成员"
+          },
+          "clear_group_member": {
+            "description": "清理群友",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "管理员"
+          },
+          "upload_group_file": {
+            "description": "上传群文件",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "成员"
+          },
+          "delete_group_file": {
+            "description": "删除群文件",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "管理员"
+          },
+          "view_group_file": {
+            "description": "查看群文件",
+            "type": "string",
+            "options": [
+              "超管",
+              "群主",
+              "管理员",
+              "高等级成员",
+              "成员"
+            ],
+            "default": "成员"
+          }
+        }
+      }
     }
+  }
 }

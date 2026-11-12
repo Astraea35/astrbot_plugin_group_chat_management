@@ -1,0 +1,15 @@
+Group Chat Management integrates the following works:
+
+Group Guardian v2.8.11, Copyright (c) 2025 zhaisir, MIT.
+Original notice retained in LICENSES/GroupGuardian-MIT.txt.
+Upstream: https://github.com/zcj-ui/astrbot_plugin_group_guardian
+
+QQAdmin v3.4.2 by Zhalslar, GNU GPL version 3.
+Integrated administration implementation in admin/, pages/settings/, and
+the admin_* command and tool entry points in main.py.
+Original project address (unavailable at integration time):
+https://github.com/Zhalslar/astrbot_plugin_qqadmin
+
+Integration and modifications by Astraea35, 2026-11-12.
+The combined distribution is provided under GPL-3.0; retained MIT portions
+remain available under their original notice.

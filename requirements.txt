@@ -3,3 +3,7 @@ pyahocorasick>=2.1.0
 # headless 版无 GUI/系统依赖，纯 pip 跨平台安装，体积较小。
 opencv-python-headless>=4.5.0
 numpy>=1.21.0
+
+aiosqlite>=0.20.0
+apscheduler>=3.10,<4
+tzdata
