@@ -45,7 +45,7 @@ https://github.com/Astraea35/astrbot_plugin_group_chat_management
 ## 开发与测试
 
 ```shell
-python -m pip install pytest pytest-asyncio pytest-subtests pillow numpy opencv-python-headless
+python -m pip install pytest pytest-asyncio pytest-subtests pillow qrcode numpy opencv-python-headless
 python -m pytest tests/test_membership_api_result.py tests/test_provider_streaming.py tests/test_group_review_policy.py tests/test_group_policy_revision.py -q
 ```
 
