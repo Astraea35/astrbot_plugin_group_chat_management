@@ -27,6 +27,8 @@ https://github.com/Astraea35/astrbot_plugin_group_chat_management
 - 整合 QQAdmin 的禁言、全禁、改名、头衔、踢人、拉黑、管理员、精华、撤回、公告、群文件、投票禁言、宵禁、欢迎与退群通知。原指令和秒数参数用法保留，例如 `/禁言 60 @用户`。
 - 同一插件提供分群权限与默认模板管理页面。`/批准`、`/驳回` 支持引用申请通知，完整保留带冒号的 OneBot 请求标识。
 - 已接管的 AI 入群申请不会再次交给传统审核；分群黑名单也纳入 AI 准入检查。LLM 管理工具始终检查权限，模型传入 `need_auth=false` 不能绕过鉴权。
+- AI 群管仅接受管理员在当前消息中明确 @机器人的自然语言请求，例如 `@机器人 把 @群员 禁言十分钟`、`@机器人 给 @群员 解禁`。只 @其他人说“禁言他”、普通成员 @机器人、唤醒词或仅引用机器人消息，都不会授权 AI 执行管理操作。原有手动指令保留。
+- AI 群管使用 AstrBot 原生工具调用接口。首选模型留空时跟随当前会话的 AstrBot 模型，可另选备用模型；仅在尚未尝试操作时故障切换，避免重复处罚。目标只能来自当前消息中的 @、引用或明确用户 ID，不从历史猜测。
 
 ## QQ 官方机器人
 
@@ -49,6 +51,9 @@ https://github.com/Astraea35/astrbot_plugin_group_chat_management
 | --- | --- |
 | `moderation_llm_provider_id` | 文字审核使用的 AstrBot 模型提供商 |
 | `ocr_provider_id` | 支持图片输入的模型；同一模型支持文字和图片时可设为相同提供商 |
+| `ai_management_enabled` | 管理员明确 @机器人后使用 AI 群管，默认开启 |
+| `ai_management_provider_id` | AI 群管首选 AstrBot 模型，留空跟随当前会话默认模型 |
+| `ai_management_fallback_provider_id` | AI 群管备用 AstrBot 模型，留空不切换 |
 | `join_empty_auto_accept` | 是否允许空白入群申请自动通过，仍受等级门槛约束 |
 | `join_min_qq_level` | 自动通过所需的真实 QQ 最低等级；0 表示不设等级门槛 |
 | `moderation_require_ai_confirmation` | 处罚前是否必须经 AI 确认 |

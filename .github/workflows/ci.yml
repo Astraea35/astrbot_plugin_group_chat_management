@@ -20,4 +20,4 @@ jobs:
           python -m compileall -q .
           python -c "import json; json.load(open('_conf_schema.json', encoding='utf-8'))"
       - name: Admission and moderation regression tests
-        run: python -m pytest tests/test_membership_api_result.py tests/test_provider_streaming.py tests/test_group_review_policy.py tests/test_group_policy_revision.py tests/test_management_merge.py tests/test_qq_official_management.py tests/test_anti_flood.py tests/test_card_monitor.py tests/test_issue92_qq_official.py tests/test_bot_admin_and_link_whitelist.py tests/test_llm_tool_schema.py -q
+        run: python -m pytest tests/test_ai_management.py tests/test_config_surfaces.py tests/test_membership_api_result.py tests/test_provider_streaming.py tests/test_group_review_policy.py tests/test_group_policy_revision.py tests/test_management_merge.py tests/test_qq_official_management.py tests/test_anti_flood.py tests/test_card_monitor.py tests/test_issue92_qq_official.py tests/test_bot_admin_and_link_whitelist.py tests/test_llm_tool_schema.py -q

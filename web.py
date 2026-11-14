@@ -2467,6 +2467,7 @@ class WebMixin:
     _GROUP_CONFIG_EXCLUDE = {
         "disclaimer_agreed", "webui_dark_mode", "prompt_injection_enabled",
         "moderation_llm_provider_id", "ocr_provider_id", "llm_max_concurrency",
+        "ai_management_enabled", "ai_management_provider_id", "ai_management_fallback_provider_id",
         "join_accept_keywords", "join_reject_keywords",
         "auto_unban_scan_interval", "card_sync_interval",
         "group_admin_grant_enabled", "legacy_role_admin_enabled",
@@ -2568,6 +2569,9 @@ class WebMixin:
         return str(group_id) in self._group_white_set
 
     _CONFIG_CATEGORIES = {
+        "ai_management_enabled": "AI群管",
+        "ai_management_provider_id": "AI群管",
+        "ai_management_fallback_provider_id": "AI群管",
         "enabled": "基础开关", "auto_moderate_enabled": "基础开关", "moderation_admin_exempt": "审核规则", "auto_moderate_notice": "基础开关",
         "moderation_require_bot_admin": "基础开关", "link_whitelist": "审核规则",
         "scan_swear": "审核规则", "scan_ad": "审核规则", "llm_moderation_enabled": "审核规则",

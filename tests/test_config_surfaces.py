@@ -69,6 +69,16 @@ class ConfigSurfaceTests(unittest.TestCase):
         ranges = self._static_return_literal("_config_int_ranges")
         self.assertEqual(ranges["llm_max_concurrency"], (1, 32))
 
+    def test_ai_management_models_use_astrbot_selectors_and_are_exposed(self):
+        self.assertTrue(self.schema["ai_management_enabled"]["default"])
+        self.assertIn("key: 'ai_management_enabled'", self.dashboard)
+        excluded = self._class_literal("_GROUP_CONFIG_EXCLUDE")
+        for key in ("ai_management_provider_id", "ai_management_fallback_provider_id"):
+            self.assertEqual("select_provider", self.schema[key]["_special"])
+            self.assertEqual("", self.schema[key]["default"])
+            self.assertIn(key, excluded)
+            self.assertIn("payload." + key, self.dashboard)
+
     def test_card_admin_exemption_is_enabled_and_exposed(self):
         setting = self.schema["card_audit_admin_exempt"]
         self.assertEqual(setting["type"], "bool")

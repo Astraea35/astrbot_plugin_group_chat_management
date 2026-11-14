@@ -2,7 +2,7 @@
 display_name: 群聊管理 # 插件的显示名称
 short_desc: "AI 入群与消息审核、分群权限、群管指令、群文件和管理员提醒"
 desc: "整合智能审核和 QQ 群管理：支持 AI 入群审核、真实 QQ 等级门槛、广告与图片二维码识别、撤回禁言后管理员私聊提醒，以及分群权限、禁言解禁、踢人拉黑、头衔、精华、公告、群文件、投票禁言、宵禁和欢迎退群通知。"
-version: v2.9.1 # 插件版本号。格式：v1.1.1 或者 v1.1
+version: v2.9.2 # 插件版本号。格式：v1.1.1 或者 v1.1
 author: zhaisir / Zhalslar / Astraea35 # 作者
 astrbot_version: ">=4.24.2"
 support_platforms: 

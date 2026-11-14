@@ -23,6 +23,26 @@
     "default": true,
     "hint": "关闭后 LLM 不会收到群管工具的使用说明和权限规则"
   },
+  "ai_management_enabled": {
+    "description": "管理员 @机器人 AI 群管",
+    "type": "bool",
+    "default": true,
+    "hint": "仅管理员在当前消息明确 @机器人时，才理解并执行禁言、解禁、踢人、撤回等管理请求。只 @群员、唤醒词或引用机器人消息不会触发；手动指令保留。"
+  },
+  "ai_management_provider_id": {
+    "description": "AI 群管首选模型",
+    "type": "string",
+    "default": "",
+    "_special": "select_provider",
+    "hint": "使用 AstrBot 已配置的模型提供商；留空跟随当前会话的 AstrBot 默认模型，仅影响管理员自然语言群管。"
+  },
+  "ai_management_fallback_provider_id": {
+    "description": "AI 群管备用模型",
+    "type": "string",
+    "default": "",
+    "_special": "select_provider",
+    "hint": "首选模型失败且尚未尝试任何管理操作时切换；留空不切换。已尝试执行操作后不会切换模型重试，避免重复处罚。"
+  },
   "group_white_list": {
     "description": "群白名单：只有列表中的群启用审核和群管功能；留空表示所有群启用",
     "type": "list",

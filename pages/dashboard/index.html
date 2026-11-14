@@ -2510,6 +2510,7 @@ var AUDIT_TOGGLES = [
   { key: 'base_decode_enabled', label: 'Base 解码审核', desc: '解码 Base16/32/58/62/64/85 及双层编码后进入规则与 AI 审核' },
   { key: 'llm_moderation_ban', label: 'AI审核后禁言', desc: 'AI判定违规后自动禁言' },
   { key: 'prompt_injection_enabled', label: '群管提示词注入', desc: '向LLM追加本轮群管权限规则' },
+  { key: 'ai_management_enabled', label: '管理员 @机器人 AI 群管', desc: '只有管理员明确 @机器人时才执行自然语言管理请求；只 @其他人不会触发' },
   { key: 'scan_forward_msg', label: '合并转发审核', desc: '解析合并转发消息内容进行审核' },
   { key: 'recall_qq_favorite_enabled', label: 'QQ收藏撤回', desc: '检测到QQ收藏转发内容自动撤回' },
   { key: 'anti_flood_enabled', label: '防刷屏', desc: '检测消息发送频率，超限自动禁言' },
@@ -2684,6 +2685,8 @@ var MANUAL_SETTING_KEYS = {
   legacy_role_admin_enabled: true,
   moderation_ban_duration: true,
   moderation_llm_provider_id: true,
+  ai_management_provider_id: true,
+  ai_management_fallback_provider_id: true,
   ban_notice: true,
   anti_flood_rate_per_second: true,
   anti_flood_rate_per_minute: true,
@@ -3642,6 +3645,8 @@ function renderExtraSettings() {
   if (!c) return;
   var banDuration = CONFIG.moderation_ban_duration != null ? CONFIG.moderation_ban_duration : 1800;
   var providerId = CONFIG.moderation_llm_provider_id || '';
+  var aiManagementProviderId = CONFIG.ai_management_provider_id || '';
+  var aiManagementFallbackProviderId = CONFIG.ai_management_fallback_provider_id || '';
   var banNotice = CONFIG.ban_notice || '[群管] {name}({uid}) 的消息已被撤回（违规内容）';
   var joinAction = CONFIG.join_default_action || 'manual';
   var joinRejectReason = CONFIG.join_reject_reason || '';
@@ -3658,6 +3663,8 @@ function renderExtraSettings() {
   c.innerHTML =
     '<div class="setting-item"><div class="setting-info"><div class="setting-label">禁言时长（秒）</div><div class="setting-desc">违规用户自动禁言时长，默认 1800 秒（30分钟）</div></div><input type="number" class="input-sm" id="inputBanDuration" value="' + banDuration + '" min="60" max="2592000" style="width:100px" /></div>' +
     '<div class="setting-item"><div class="setting-info"><div class="setting-label">审核 LLM 模型</div><div class="setting-desc">用于 AI 审核的 LLM 提供商（留空使用默认）</div></div><select class="input-sm" id="inputProviderId" style="width:220px">' + providerOptions + '</select></div>' +
+    '<div class="setting-item"><div class="setting-info"><div class="setting-label">AI 群管首选模型</div><div class="setting-desc">用于管理员 @机器人的自然语言群管，留空跟随当前会话的 AstrBot 默认模型</div></div><select class="input-sm" id="inputAiManagementProviderId" style="width:220px">' + renderProviderOptions(aiManagementProviderId, '跟随 AstrBot 默认模型') + '</select></div>' +
+    '<div class="setting-item"><div class="setting-info"><div class="setting-label">AI 群管备用模型</div><div class="setting-desc">首选模型失败时切换；已尝试管理操作后不再切换重试，避免重复处罚</div></div><select class="input-sm" id="inputAiManagementFallbackProviderId" style="width:220px">' + renderProviderOptions(aiManagementFallbackProviderId, '不使用备用模型') + '</select></div>' +
     '<div class="setting-item"><div class="setting-info"><div class="setting-label">封禁通知模板</div><div class="setting-desc">支持变量：{name} 用户名、{uid} QQ号、{group} 群号</div></div><input type="text" class="input-sm" id="inputBanNotice" value="' + escAttr(banNotice) + '" style="width:260px" /></div>' +
     '<hr style="margin:16px 0;border:none;border-top:1px solid var(--border)">' +
     '<h3 style="font-size:13px;font-weight:600;margin-bottom:12px">入群审核设置</h3>' +
@@ -3774,6 +3781,10 @@ async function saveSettings() {
   if (banDuration) payload.moderation_ban_duration = parseInt(banDuration.value, 10) || 1800;
   var providerId = $('#inputProviderId');
   if (providerId) payload.moderation_llm_provider_id = providerId.value;
+  var aiManagementProviderId = $('#inputAiManagementProviderId');
+  if (aiManagementProviderId) payload.ai_management_provider_id = aiManagementProviderId.value;
+  var aiManagementFallbackProviderId = $('#inputAiManagementFallbackProviderId');
+  if (aiManagementFallbackProviderId) payload.ai_management_fallback_provider_id = aiManagementFallbackProviderId.value;
   var banNotice = $('#inputBanNotice');
   if (banNotice) payload.ban_notice = banNotice.value.trim();
   var joinAction = $('#inputJoinAction');
