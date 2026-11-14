@@ -222,6 +222,12 @@ class AntiFloodRepeatTests(unittest.TestCase):
                 harness._anti_flood_event_is_duplicate("100", "200", tracking_id)
             )
 
+    def test_official_opaque_recall_id_requires_explicit_platform(self):
+        from_method = AntiFloodMixin._anti_flood_recallable_message_id
+        self.assertEqual(from_method("ROBOT1.0_SYNTHETIC", allow_opaque=True), "ROBOT1.0_SYNTHETIC")
+        self.assertEqual(from_method("ROBOT1.0_SYNTHETIC"), "")
+        self.assertEqual(from_method("seq:123", allow_opaque=True), "")
+
     def test_sequence_fallback_is_not_recallable_and_missing_id_is_still_counted(self):
         sequence_event = SimpleNamespace(
             message_obj=SimpleNamespace(message_id="", message_seq=12),

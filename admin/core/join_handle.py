@@ -1,3 +1,4 @@
+from ...qq_official import action_id, is_official, raw_event
 from aiocqhttp import CQHttp
 
 from astrbot.api import logger
@@ -246,7 +247,7 @@ class JoinHandle:
 
     async def event_monitoring(self, event: AiocqhttpMessageEvent):
         """监听进群/退群事件"""
-        raw = getattr(event.message_obj, "raw_message", None)
+        raw = raw_event(event)
         if not isinstance(raw, dict):
             return
 
@@ -265,8 +266,8 @@ class JoinHandle:
                 return
             comment = raw.get("comment")
             flag = raw.get("flag", "")
-            info = await client.get_stranger_info(user_id=int(uid))
-            nickname = info.get("nickname") or "未知昵称"
+            info = {} if is_official(event) else await client.get_stranger_info(user_id=action_id(event, uid))
+            nickname = info.get("nickname") or raw.get("username") or "未知昵称"
             if info.get("isHideQQLevel"):
                 level = None
             else:
@@ -274,6 +275,8 @@ class JoinHandle:
 
             # 判断是否通过
             approve, reason = await self.should_approve(gid, uid, comment, level)
+            if approve is True and is_official(event) and await self.db.get(gid, "join_min_level", 0) > 0:
+                approve, reason = None, "官方平台无法查询真实QQ等级，需人工确认"
             # 清理缓存
             if approve is True:
                 self._fail.pop(f"{gid}_{uid}", None)
@@ -308,9 +311,13 @@ class JoinHandle:
 
             group_config = self.db.get_group_snapshot(gid)
             if group_config.get("admin_audit", self.cfg.admin_audit):
-                await self._send_admin(client, notice)
+                if is_official(event):
+                    await event.send(event.plain_result(notice))
+                else:
+                    await self._send_admin(client, notice)
             else:
                 await event.send(event.plain_result(notice))
+            return True
 
         # 主动退群事件
         elif (
@@ -340,8 +347,8 @@ class JoinHandle:
             if join_ban_time > 0:
                 try:
                     await client.set_group_ban(
-                        group_id=int(gid),
-                        user_id=int(uid),
+                        group_id=action_id(event, gid),
+                        user_id=action_id(event, uid),
                         duration=join_ban_time,
                     )
                 except Exception:

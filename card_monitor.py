@@ -280,8 +280,8 @@ class CardMonitorMixin:
 
     async def _fetch_member_card(self, client, group_id: str, user_id: str):
         """通过标准 get_group_member_info 获取名片；失败返回 None。"""
-        gid = self._safe_int(group_id, 0)
-        uid = self._safe_int(user_id, 0)
+        gid = self._api_id(group_id, 0)
+        uid = self._api_id(user_id, 0)
         if not client or not gid or not uid:
             return None
         last_error = None
@@ -608,11 +608,11 @@ class CardMonitorMixin:
 
     async def _restore_card(self, group_id: str, user_id: str, card: str) -> bool:
         """把某成员名片改回指定值。card 为空串表示清除名片。"""
-        gid = self._safe_int(group_id, 0)
-        uid = self._safe_int(user_id, 0)
+        gid = self._api_id(group_id, 0)
+        uid = self._api_id(user_id, 0)
         if not gid or not uid:
             return False
-        client = await self._get_client()
+        client = await self._client_for_group(group_id)
         if not client:
             return False
         ok, err = await self._call_group_api(client, 'set_group_card', "还原名片",
@@ -623,10 +623,10 @@ class CardMonitorMixin:
 
     async def _notify_card_group(self, group_id: str, text: str) -> None:
         try:
-            gid = self._safe_int(group_id, 0)
+            gid = self._api_id(group_id, 0)
             if not gid:
                 return
-            client = await self._get_client()
+            client = await self._client_for_group(group_id)
             if client:
                 ok, error = await self._call_group_api(
                     client, "send_group_msg", "发送名片监控通知",
@@ -768,7 +768,7 @@ class CardMonitorMixin:
                 item for item in self._card_pending_members if item[0] == group_id
             }
             try:
-                gid = self._safe_int(group_id, 0)
+                gid = self._api_id(group_id, 0)
                 if not gid:
                     continue
                 result = await self._call_card_sync_api(

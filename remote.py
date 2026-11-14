@@ -44,7 +44,7 @@ class RemoteMixin:
     async def _remote_execute_single(self, client, gid: int, action: str, user_id: str, params: dict) -> tuple:
         """执行单个远程操作，返回 (ok, msg)。"""
         params = params or {}
-        uid = self._safe_int(user_id, 0) if user_id else 0
+        uid = self._api_id(user_id, 0) if user_id else 0
 
         # 写操作前置校验：bot 自身权限 + 目标角色（群主/管理员保护），避免必然失败的调用
         if uid:
@@ -88,17 +88,17 @@ class RemoteMixin:
             return await self._call_group_api(client, "_send_group_notice", "发群公告",
                                               group_id=gid, content=str(params.get("content", "")))
         if action == "recall":
-            mid = self._safe_int(params.get("message_id", 0), 0)
+            mid = self._api_id(params.get("message_id", 0), 0)
             if not mid:
                 return False, "缺少 message_id"
             return await self._call_group_api(client, "delete_msg", "撤回消息", message_id=mid)
         if action == "set_essence":
-            mid = self._safe_int(params.get("message_id", 0), 0)
+            mid = self._api_id(params.get("message_id", 0), 0)
             if not mid:
                 return False, "缺少 message_id"
             return await self._call_group_api(client, "set_essence_msg", "设精华", message_id=mid)
         if action == "del_essence":
-            mid = self._safe_int(params.get("message_id", 0), 0)
+            mid = self._api_id(params.get("message_id", 0), 0)
             if not mid:
                 return False, "缺少 message_id"
             return await self._call_group_api(client, "delete_essence_msg", "取消精华", message_id=mid)
@@ -119,7 +119,7 @@ class RemoteMixin:
         if not meta:
             return {"ok": False, "message": f"未知操作: {action}"}
         cfg_key, cn_name, need_user = meta
-        gid = self._safe_int(group_id, 0)
+        gid = self._api_id(group_id, 0)
         if not gid:
             return {"ok": False, "message": "群号无效"}
         gid_str = str(gid)
@@ -131,7 +131,7 @@ class RemoteMixin:
         ok, msg = self._cfg_check(cfg_key, cn_name, group_id=gid_str)
         if not ok:
             return {"ok": False, "message": msg}
-        client = await self._get_client(None)
+        client = await self._client_for_group(group_id)
         if not client:
             return {"ok": False, "message": "无法获取 QQ 客户端，请确保已连接"}
 
@@ -140,10 +140,10 @@ class RemoteMixin:
         if need_user:
             raw_ids = params.get("user_ids")
             if isinstance(raw_ids, list) and raw_ids:
-                targets = [str(x).strip() for x in raw_ids if str(x).strip().isdigit()]
+                targets = [str(x).strip() for x in raw_ids if self._api_id(str(x).strip())]
             elif params.get("user_id"):
                 uid = str(params.get("user_id")).strip()
-                if uid.isdigit():
+                if self._api_id(uid):
                     targets = [uid]
             if not targets:
                 return {"ok": False, "message": "请提供有效的成员 QQ 号"}

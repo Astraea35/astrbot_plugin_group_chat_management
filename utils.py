@@ -21,28 +21,9 @@ class UtilitiesMixin:
         return await asyncio.get_running_loop().run_in_executor(None, call)
 
     def _extract_at_targets(self, event) -> list:
-        targets = []
-        seen = set()
-        try:
-            chain = event.get_messages() or []
-        except Exception:
-            chain = []
-        for seg in chain:
-            qq = None
-            if isinstance(seg, dict):
-                if seg.get("type") == "at":
-                    qq = (seg.get("data", {}) or {}).get("qq", "")
-            else:
-                seg_cls = type(seg).__name__
-                if seg_cls == "At" or (hasattr(seg, "type") and getattr(seg, "type", "") == "at"):
-                    qq = getattr(seg, "qq", "") or ""
-            qq = str(qq).strip()
-            if not qq or qq.lower() in ("all", "0"):
-                continue
-            if qq not in seen and qq.isdigit():
-                seen.add(qq)
-                targets.append(qq)
-        return targets
+        from .qq_official import mention_ids
+
+        return mention_ids(event)
 
     def _extract_reply_msg_id(self, event) -> str:
         """从消息链提取被引用（回复）消息的 ID，无引用返回空串。兼容 dict/对象两种段格式。"""

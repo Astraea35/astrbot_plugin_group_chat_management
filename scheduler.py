@@ -96,6 +96,9 @@ class SchedulerMixin:
                 break
             try:
                 await self._run_due_unbans()
+                poll = getattr(self, "_poll_official_requests", None)
+                if callable(poll):
+                    await poll()
                 expire_fn = getattr(self, "_expire_appeals", None)
                 if expire_fn:
                     await expire_fn()

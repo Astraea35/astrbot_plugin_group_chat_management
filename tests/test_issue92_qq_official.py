@@ -161,11 +161,10 @@ class PlatformDetectionTests(unittest.TestCase):
         event = types.SimpleNamespace(platform_meta=types.SimpleNamespace(name="qq_official"))
         self.assertEqual(host._event_platform_name(event), "qq_official")
 
-    def test_qq_official_reports_unsupported(self):
+    def test_qq_official_reaches_its_api_adapter(self):
         host = _Host()
         msg = host._onebot_unsupported_message(_Event(platform="qq_official", bot=object()))
-        self.assertIn("qq_official", msg)
-        self.assertIn("aiocqhttp", msg)
+        self.assertEqual(msg, "")
 
     def test_onebot_and_unknown_platforms_not_blocked(self):
         host = _Host()
@@ -196,21 +195,20 @@ class AdminDeniedMessageTests(unittest.TestCase):
 
 
 class CheckAdminCfgAccessTests(unittest.TestCase):
-    def test_qq_official_short_circuits_before_admin_check(self):
+    def test_qq_official_checks_operator_permission(self):
         host = _Host(admins=["3868975329"])
         ok, msg = _run(host._check_admin_cfg_access(
             _Event(platform="qq_official", bot=object()), "whole_ban_enabled", "全体禁言"))
         self.assertFalse(ok)
-        self.assertIn("qq_official", msg)
-        self.assertEqual(host.is_admin_calls, 0)
+        self.assertIn(OPENID, msg)
+        self.assertEqual(host.is_admin_calls, 1)
 
-    def test_qq_official_blocks_query_actions_too(self):
+    def test_qq_official_allows_enabled_query_actions(self):
         host = _Host()
         ok, msg = _run(host._check_admin_cfg_access(
             _Event(platform="qq_official", bot=object()), "member_list_enabled", "查看群成员列表",
             need_admin=False))
-        self.assertFalse(ok)
-        self.assertIn("不支持", msg)
+        self.assertTrue(ok, msg)
 
     def test_non_admin_openid_gets_id_hint(self):
         host = _Host(admins=["3868975329"])

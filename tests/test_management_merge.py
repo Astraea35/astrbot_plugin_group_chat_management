@@ -28,6 +28,7 @@ def load_class(filename, name, namespace=None):
         type_ignores=[],
     )
     env = namespace or {}
+    env.setdefault("adapt_event", lambda event: event)
     exec(compile(ast.fix_missing_locations(module), filename, "exec"), env)
     return env[name]
 

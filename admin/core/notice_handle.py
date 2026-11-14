@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from ...qq_official import action_id
+
 import textwrap
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -32,7 +34,7 @@ class NoticeHandle:
         if not content:
             return "未指定群公告内容"
         gid = event.get_group_id()
-        kwargs = {"group_id": int(gid), "content": content}
+        kwargs = {"group_id": action_id(event, gid), "content": content}
         if image_url := (image_url or extract_image_url(chain=event.get_messages())):
             img_name = f"{gid}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
             temp_path = self.cfg.group_notice_dir / img_name
@@ -48,7 +50,7 @@ class NoticeHandle:
 
     async def get_group_notice(self, event: AiocqhttpMessageEvent):
         """查看群公告"""
-        notices = await event.bot._get_group_notice(group_id=int(event.get_group_id()))
+        notices = await event.bot._get_group_notice(group_id=action_id(event, event.get_group_id()))
 
         formatted_messages = []
         for notice in notices:

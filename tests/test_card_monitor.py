@@ -61,6 +61,12 @@ def _load_module(name, filename):
 
 _install_astrbot_stubs()
 card_monitor = _load_module("group_guardian_card_monitor", "card_monitor.py")
+_onebot_tree = ast.parse((ROOT / "onebot.py").read_text(encoding="utf-8"))
+_onebot_class = next(node for node in _onebot_tree.body if isinstance(node, ast.ClassDef) and node.name == "OneBotMixin")
+_api_id_node = next(node for node in _onebot_class.body if isinstance(node, ast.FunctionDef) and node.name == "_api_id")
+_api_namespace = {}
+exec(compile(ast.fix_missing_locations(ast.Module(body=[_api_id_node], type_ignores=[])), "onebot.py", "exec"), _api_namespace)
+
 scheduler = _load_module("group_guardian_scheduler", "scheduler.py")
 
 
@@ -138,6 +144,11 @@ class _Event:
 
 
 class _CardHarness(card_monitor.CardMonitorMixin):
+    _api_id = _api_namespace["_api_id"]
+
+    async def _client_for_group(self, group_id, event=None):
+        return await self._get_client(event)
+
     def __init__(self, client=None):
         self.client = client
         self.config = {"disclaimer_agreed": True}

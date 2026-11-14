@@ -125,6 +125,8 @@ def _make_plugin(moderation, client, enabled=True):
             except (TypeError, ValueError):
                 return default
 
+        _api_id = _safe_int
+
         async def _get_client(self, event=None):
             return client
 

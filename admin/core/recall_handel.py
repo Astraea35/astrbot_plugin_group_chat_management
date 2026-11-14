@@ -1,3 +1,4 @@
+from ...qq_official import action_id
 import asyncio
 
 from astrbot.core.message.components import At, Reply
@@ -22,7 +23,7 @@ class RecallHandle:
         first_seg = chain[0]
         if isinstance(first_seg, Reply):
             try:
-                await client.delete_msg(message_id=int(first_seg.id))
+                await client.delete_msg(message_id=action_id(event, first_seg.id))
             except Exception:
                 await event.send(event.plain_result("我无权撤回这条消息"))
             finally:
@@ -35,7 +36,7 @@ class RecallHandle:
             count = int(end_arg) if end_arg.isdigit() else 10
 
             payloads = {
-                "group_id": int(event.get_group_id()),
+                "group_id": action_id(event, event.get_group_id()),
                 "message_seq": 0,
                 "count": count,
                 "reverseOrder": True,

@@ -139,7 +139,8 @@ class PluginConfig(ConfigNode):
     def __init__(self, cfg: AstrBotConfig, context: Context):
         super().__init__(cfg)
         self.context = context
-        self.admins_id = self._clean_ids(context.get_config().get("admins_id", []))
+        bot_config = context.get_config()
+        self.admins_id = self._clean_ids(list(bot_config.get("admin_id", [])) + list(bot_config.get("admins_id", [])))
 
         self.data_dir = StarTools.get_data_dir(self._plugin_name) / "management"
         self.data_dir.mkdir(parents=True, exist_ok=True)

@@ -12,6 +12,7 @@ from astrbot.core.platform.sources.aiocqhttp.aiocqhttp_message_event import (
 from .config import PluginConfig
 from .data import QQAdminDB
 from .utils import get_ats
+from ..qq_official import OfficialAPIError, adapt_event, is_official
 
 
 class PermLevel(IntEnum):
@@ -64,8 +65,9 @@ class PermissionManager:
         self.db = db
         self._initialized = True
 
-    def refresh(self, config: PluginConfig, db: QQAdminDB | None = None):
+    def refresh(self, config: PluginConfig, db: QQAdminDB | None = None, host=None):
         self.cfg = config
+        self.host = host
         if db is not None:
             self.db = db
         self._initialized = True
@@ -74,8 +76,40 @@ class PermissionManager:
         self, event: AiocqhttpMessageEvent, user_id: str | int
     ) -> PermLevel:
         group_id = event.get_group_id()
-        if int(group_id) == 0 or int(user_id) == 0:
+        if not group_id or not user_id or str(group_id) == "0" or str(user_id) == "0":
             return PermLevel.UNKNOWN
+        if is_official(event):
+            event = adapt_event(event)
+            host = getattr(self, "host", None)
+            if host is not None and str(user_id) == str(event.get_sender_id()):
+                event._operator_blocked = host._is_group_admin_blocked(
+                    group_id, str(user_id)
+                )
+                event._operator_admin = await host._is_admin(event)
+            if str(user_id) == str(event.get_sender_id()) and getattr(
+                event, "_operator_blocked", False
+            ):
+                return PermLevel.UNKNOWN
+            if str(user_id) == str(event.get_sender_id()) and (
+                getattr(event, "_operator_admin", False)
+                or event.is_admin()
+                or (self.cfg and str(user_id) in self.cfg.admins_id)
+            ):
+                return PermLevel.SUPERUSER
+            try:
+                if str(user_id) == str(event.get_self_id()):
+                    info = await event.bot.bot_state(group_id)
+                else:
+                    info = await event.bot.get_group_member_info(
+                        group_id=group_id, user_id=str(user_id)
+                    )
+                return {
+                    "owner": PermLevel.OWNER,
+                    "admin": PermLevel.ADMIN,
+                    "member": PermLevel.MEMBER,
+                }.get(info.get("member_role", info.get("role")), PermLevel.UNKNOWN)
+            except OfficialAPIError:
+                return PermLevel.UNKNOWN
         if self.cfg and str(user_id) in self.cfg.admins_id:
             return PermLevel.SUPERUSER
         try:
@@ -123,6 +157,27 @@ class PermissionManager:
         if user_level > required_level:
             return f"你没{required_level}权限"
 
+        if is_official(event):
+            unsupported = {
+                "whole_ban": "全体禁言",
+                "set_group_card": "修改群名片",
+                "set_group_special_title": "修改头衔",
+                "set_group_special_title_me": "申请头衔",
+                "admin": "任免管理员",
+                "essence": "设置精华",
+                "get_essence_msg_list": "群精华列表",
+                "set_group_portrait": "修改群头像",
+                "set_group_name": "修改群名",
+                "send_group_notice": "群公告",
+                "get_group_notice": "群公告",
+                "curfew": "宵禁全禁",
+                "upload_group_file": "管理群文件",
+                "delete_group_file": "管理群文件",
+                "view_group_file": "管理群文件",
+            }
+            if perm_key in unsupported:
+                return f"QQ官方平台暂未提供本插件所需的{unsupported[perm_key]}接口，请通过OneBot使用该功能"
+
         bot_level = await self.get_perm_level(event, user_id=event.get_self_id())
         if bot_level > bot_perm:
             return f"我没{bot_perm}权限"
@@ -141,7 +196,7 @@ class PermissionManager:
         perm_key: str,
         bot_perm: PermLevel = PermLevel.ADMIN,
     ) -> str | None:
-        if event.platform_meta.name != "aiocqhttp":
+        if event.platform_meta.name != "aiocqhttp" and not is_official(event):
             return "该工具仅支持通过 QQ 群聊调用"
 
         if event.is_private_chat():
@@ -191,8 +246,19 @@ def perm_required(
         ) -> AsyncGenerator[Any, Any]:
 
             # 仅限aiocqhttp
-            if event.platform_meta.name != "aiocqhttp":
+            if event.platform_meta.name != "aiocqhttp" and not is_official(event):
                 return
+
+            event = (
+                adapt_event(event, await plugin_instance._get_client(event))
+                if is_official(event)
+                else event
+            )
+            if is_official(event):
+                event._operator_blocked = plugin_instance._is_group_admin_blocked(
+                    event.get_group_id(), event.get_sender_id()
+                )
+                event._operator_admin = await plugin_instance._is_admin(event)
 
             # 仅限群聊
             if event.is_private_chat():
@@ -212,18 +278,24 @@ def perm_required(
                 event, bot_perm=bot_perm, perm_key=actual_perm_key, check_at=check_at
             )
             if result:
+                if is_official(event):
+                    result += f"\n官方平台按OpenID授权；你的OpenID：{event.get_sender_id()}。成员资料接口未开通时，请将此ID加入插件管理员或本群超管。"
                 yield event.plain_result(result)
                 event.stop_event()
                 return
 
             # 执行原始方法
-            if inspect.isasyncgenfunction(func):
-                async for item in func(plugin_instance, event, *args, **kwargs):
-                    yield item
-            else:
-                await cast(
-                    Awaitable[Any], func(plugin_instance, event, *args, **kwargs)
-                )
+            try:
+                if inspect.isasyncgenfunction(func):
+                    async for item in func(plugin_instance, event, *args, **kwargs):
+                        yield item
+                else:
+                    await cast(
+                        Awaitable[Any], func(plugin_instance, event, *args, **kwargs)
+                    )
+            except OfficialAPIError as exc:
+                yield event.plain_result(str(exc))
+                event.stop_event()
 
         return wrapper
 

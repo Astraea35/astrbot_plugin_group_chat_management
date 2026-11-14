@@ -600,6 +600,6 @@ class LlmToolsMixin:
         result = []
         for it in items:
             s = str(it).strip()
-            if s.isdigit():
+            if re.fullmatch(r"[A-Za-z0-9_-]+", s):
                 result.append(s)
         return result

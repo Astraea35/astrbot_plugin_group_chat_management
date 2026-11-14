@@ -446,12 +446,9 @@ class MembershipMixin:
     @staticmethod
     def _get_raw_event(event: AstrMessageEvent):
         """取 OneBot 原始事件 dict（兼容 raw_event / message_obj.raw_message 两种来源）。"""
-        raw = getattr(event, "raw_event", None)
-        if isinstance(raw, dict):
-            return raw
-        msg_obj = getattr(event, "message_obj", None)
-        raw = getattr(msg_obj, "raw_message", None) if msg_obj else None
-        return raw if isinstance(raw, dict) else None
+        from .qq_official import raw_event
+
+        return raw_event(event)
 
     def _resolve_join_rule(self, group_id: str) -> dict:
         """Resolve join rules with explicit per-field precedence.
@@ -881,7 +878,7 @@ class MembershipMixin:
                 client,
                 "get_stranger_info",
                 "读取申请人QQ等级",
-                user_id=int(user_id),
+                user_id=self._api_id(user_id),
             )
             value = (
                 profile.get("qqLevel", profile.get("qq_level", profile.get("level")))
@@ -934,9 +931,9 @@ class MembershipMixin:
         action = "通过" if approved else "拒绝"
         text = f"[入群审核] {user_id} 申请加群已{action}。详细原因已记入审核日志。"
         try:
-            gid_int = self._safe_int(group_id, 0)
+            gid_int = self._api_id(group_id, 0)
             if gid_int:
-                client = await self._get_client()
+                client = await self._client_for_group(group_id)
                 if client:
                     ok, error = await self._call_group_api(
                         client,

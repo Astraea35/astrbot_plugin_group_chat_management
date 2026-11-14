@@ -1,3 +1,4 @@
+from ...qq_official import action_id
 import asyncio
 import json
 import time
@@ -133,7 +134,7 @@ class BanproHandle:
                 # 撤回消息
                 try:
                     message_id = event.message_obj.message_id
-                    await event.bot.delete_msg(message_id=int(message_id))
+                    await event.bot.delete_msg(message_id=action_id(event, message_id))
                 except Exception:
                     pass
                 # 禁言发送者
@@ -141,8 +142,8 @@ class BanproHandle:
                 if ban_time > 0:
                     try:
                         await event.bot.set_group_ban(
-                            group_id=int(event.get_group_id()),
-                            user_id=int(event.get_sender_id()),
+                            group_id=action_id(event, event.get_group_id()),
+                            user_id=action_id(event, event.get_sender_id()),
                             duration=ban_time,
                         )
                     except Exception:
@@ -198,8 +199,8 @@ class BanproHandle:
 
                 try:
                     await event.bot.set_group_ban(
-                        group_id=int(group_id),
-                        user_id=int(sender_id),
+                        group_id=action_id(event, group_id),
+                        user_id=action_id(event, sender_id),
                         duration=ban_time,
                     )
                     nickname = await get_nickname(event, sender_id)
@@ -263,8 +264,8 @@ class BanproHandle:
             if agree_count > disagree_count:
                 try:
                     await event.bot.set_group_ban(
-                        group_id=int(group_id),
-                        user_id=int(record["target"]),
+                        group_id=action_id(event, group_id),
+                        user_id=action_id(event, record["target"]),
                         duration=record["ban_time"],
                     )
                     await event.send(
@@ -309,8 +310,8 @@ class BanproHandle:
         if agree_count >= threshold:
             try:
                 await event.bot.set_group_ban(
-                    group_id=int(group_id),
-                    user_id=int(target_id),
+                    group_id=action_id(event, group_id),
+                    user_id=action_id(event, target_id),
                     duration=record["ban_time"],
                 )
                 await event.send(event.plain_result(f"投票通过！已禁言{nickname}"))

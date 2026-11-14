@@ -112,6 +112,7 @@ class StorageMigrationTests(unittest.TestCase):
                     "VALUES('123', '456', 900, 800)"
                 )
 
+            conn.close()
             with store._connect() as conn:
                 storage_module.SQLiteStorage._create_tables(conn)
                 columns = {

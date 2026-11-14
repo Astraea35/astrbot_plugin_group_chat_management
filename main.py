@@ -25,6 +25,7 @@ from .llm_tools import LlmToolsMixin
 from .membership import MembershipMixin
 from .moderation import ModerationMixin
 from .moderation_review import ModerationReviewMixin
+from .qq_official import adapt_event, is_official
 from .onebot import OneBotMixin
 from .remote import RemoteMixin
 from .scheduler import SchedulerMixin
@@ -749,14 +750,16 @@ class Main(
     # 消息监听注册区：审核主流程由 moderation.py 实现，这里只负责注册事件入口。
     # moderation._handle_message 是 async generator，必须用 async for/yield 转发，不能 await。
     @filter.event_message_type(filter.EventMessageType.ALL)
-    @filter.platform_adapter_type(filter.PlatformAdapterType.AIOCQHTTP)
+    @filter.platform_adapter_type(filter.PlatformAdapterType.AIOCQHTTP | filter.PlatformAdapterType.QQOFFICIAL | filter.PlatformAdapterType.QQOFFICIAL_WEBHOOK)
     async def _handle_message(self, event: AiocqhttpMessageEvent):
+        if is_official(event):
+            await self._get_client(event)
         async for item in ModerationMixin._handle_message(self, event):
             yield item
 
     # F1 入群自动审核：监听加群申请事件（与 _handle_message 共用 ALL 监听，互不干扰）。
     @filter.event_message_type(filter.EventMessageType.ALL)
-    @filter.platform_adapter_type(filter.PlatformAdapterType.AIOCQHTTP)
+    @filter.platform_adapter_type(filter.PlatformAdapterType.AIOCQHTTP | filter.PlatformAdapterType.QQOFFICIAL | filter.PlatformAdapterType.QQOFFICIAL_WEBHOOK)
     async def _on_group_request(self, event: AiocqhttpMessageEvent):
         if not self._is_group_request_event(event):
             return
@@ -769,7 +772,7 @@ class Main(
 
     # 名片监控：监听 group_card（名片变更）通知事件（与其它 ALL 监听互不干扰）。
     @filter.event_message_type(filter.EventMessageType.ALL)
-    @filter.platform_adapter_type(filter.PlatformAdapterType.AIOCQHTTP)
+    @filter.platform_adapter_type(filter.PlatformAdapterType.AIOCQHTTP | filter.PlatformAdapterType.QQOFFICIAL | filter.PlatformAdapterType.QQOFFICIAL_WEBHOOK)
     async def _on_group_card_change(self, event: AiocqhttpMessageEvent):
         if not self._is_group_card_notice(event):
             return
@@ -783,7 +786,7 @@ class Main(
     # 名片监控兼容入口：group_increase 是 OneBot v11 标准通知。
     # 部分协议端不发送非标准 group_card，入群时查询一次成员名片，避免必须先发言。
     @filter.event_message_type(filter.EventMessageType.ALL)
-    @filter.platform_adapter_type(filter.PlatformAdapterType.AIOCQHTTP)
+    @filter.platform_adapter_type(filter.PlatformAdapterType.AIOCQHTTP | filter.PlatformAdapterType.QQOFFICIAL | filter.PlatformAdapterType.QQOFFICIAL_WEBHOOK)
     async def _on_group_increase_card_check(self, event: AiocqhttpMessageEvent):
         if not self._is_group_increase_notice(event):
             return
@@ -796,7 +799,7 @@ class Main(
 
     # 名片监控：监听 group_admin（管理员任免）通知事件。
     @filter.event_message_type(filter.EventMessageType.ALL)
-    @filter.platform_adapter_type(filter.PlatformAdapterType.AIOCQHTTP)
+    @filter.platform_adapter_type(filter.PlatformAdapterType.AIOCQHTTP | filter.PlatformAdapterType.QQOFFICIAL | filter.PlatformAdapterType.QQOFFICIAL_WEBHOOK)
     async def _on_group_admin_change(self, event: AiocqhttpMessageEvent):
         if not self._is_group_admin_notice(event):
             return
@@ -819,7 +822,7 @@ class Main(
     # Issue #93：成员被解除禁言（OneBot group_ban 通知，sub_type=lift_ban）时清除处罚冷却，
     # 管理员提前解禁后该成员再违规可按正常流程处罚。广播型通知，不 stop_event。
     @filter.event_message_type(filter.EventMessageType.ALL)
-    @filter.platform_adapter_type(filter.PlatformAdapterType.AIOCQHTTP)
+    @filter.platform_adapter_type(filter.PlatformAdapterType.AIOCQHTTP | filter.PlatformAdapterType.QQOFFICIAL | filter.PlatformAdapterType.QQOFFICIAL_WEBHOOK)
     async def _on_group_ban_lift(self, event: AiocqhttpMessageEvent):
         raw = self._get_raw_event(event)
         if not (
@@ -836,7 +839,7 @@ class Main(
 
     # F2 私聊申诉裁决：私聊消息且发送者有 waiting 申诉时进入。
     @filter.event_message_type(filter.EventMessageType.PRIVATE_MESSAGE)
-    @filter.platform_adapter_type(filter.PlatformAdapterType.AIOCQHTTP)
+    @filter.platform_adapter_type(filter.PlatformAdapterType.AIOCQHTTP | filter.PlatformAdapterType.QQOFFICIAL | filter.PlatformAdapterType.QQOFFICIAL_WEBHOOK)
     async def _on_private_appeal(self, event: AiocqhttpMessageEvent):
         if not self._is_user_private_message_event(event):
             return
@@ -891,6 +894,7 @@ class Main(
             yield item
 
     # F4 批量管理 LLM 工具
+    @filter.llm_tool(name="batch_ban_members")
     async def batch_ban_members_tool(
         self, event: AstrMessageEvent, user_ids: List[str], duration_minutes: int = 10
     ):
@@ -905,6 +909,7 @@ class Main(
         ):
             yield item
 
+    @filter.llm_tool(name="batch_kick_members")
     async def batch_kick_members_tool(
         self, event: AstrMessageEvent, user_ids: List[str]
     ):
@@ -938,7 +943,7 @@ class Main(
     async def _initialize_management(self):
         await self._admin_db.init()
         await self._admin_curfew.initialize()
-        perm_manager.refresh(self._admin_cfg, self._admin_db)
+        perm_manager.refresh(self._admin_cfg, self._admin_db, host=self)
 
     async def _terminate_management(self):
         await self._admin_curfew.stop_all_tasks()
@@ -1160,9 +1165,10 @@ class Main(
         """内置禁词 开/关"""
         await self._admin_banpro.handle_builtin_ban_words(event, mode)
 
-    @filter.platform_adapter_type(filter.PlatformAdapterType.AIOCQHTTP)
+    @filter.platform_adapter_type(filter.PlatformAdapterType.AIOCQHTTP | filter.PlatformAdapterType.QQOFFICIAL | filter.PlatformAdapterType.QQOFFICIAL_WEBHOOK)
     @filter.event_message_type(EventMessageType.GROUP_MESSAGE)
     async def admin_on_ban_words(self, event: AiocqhttpMessageEvent):
+        event = adapt_event(event)
         """自动检测违禁词，撤回并禁言"""
         if not event.is_admin():
             await self._admin_banpro.on_ban_words(event)
@@ -1175,9 +1181,10 @@ class Main(
         """刷屏禁言 <秒数>, 设为 0 表示关闭禁词检测"""
         await self._admin_banpro.handle_spamming_ban_time(event, time)
 
-    @filter.platform_adapter_type(filter.PlatformAdapterType.AIOCQHTTP)
+    @filter.platform_adapter_type(filter.PlatformAdapterType.AIOCQHTTP | filter.PlatformAdapterType.QQOFFICIAL | filter.PlatformAdapterType.QQOFFICIAL_WEBHOOK)
     @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE)
     async def admin_spamming_ban(self, event: AiocqhttpMessageEvent):
+        event = adapt_event(event)
         """刷屏检测与禁言"""
         await self._admin_banpro.spamming_ban(event)
 
@@ -1320,9 +1327,10 @@ class Main(
         """退群拉黑 开/关, 拉黑后下次进群直接自动拒绝"""
         await self._admin_join.handle_leave_block(event, mode)
 
-    @filter.platform_adapter_type(filter.PlatformAdapterType.AIOCQHTTP)
+    @filter.platform_adapter_type(filter.PlatformAdapterType.AIOCQHTTP | filter.PlatformAdapterType.QQOFFICIAL | filter.PlatformAdapterType.QQOFFICIAL_WEBHOOK)
     @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE)
     async def admin_event_monitoring(self, event: AiocqhttpMessageEvent):
+        event = adapt_event(event)
         raw = self._get_raw_event(event) or {}
         if (
             raw.get("post_type") == "request"
@@ -1386,7 +1394,7 @@ class Main(
     async def admin_llm_set_group_ban(
         self,
         event: AiocqhttpMessageEvent,
-        user_id: int,
+        user_id: str,
         duration: int | None = None,
         need_auth: bool = True,
     ):
@@ -1416,14 +1424,14 @@ class Main(
     async def admin_llm_set_group_card(
         self,
         event: AiocqhttpMessageEvent,
-        target_id: int,
+        target_id: str,
         target_card: str,
         need_auth: bool = True,
     ):
         """
         给群聊中某用户设置群昵称。
         Args:
-            target_id(number): 要设置群昵称的用户的QQ
+            target_id(string): 要设置群昵称的用户的QQ
             target_card(string): 要设置的群昵称
             need_auth(boolean): 兼容参数；无论取值如何，始终检查当前群用户权限
         """
@@ -1446,14 +1454,14 @@ class Main(
     async def admin_llm_set_group_special_title(
         self,
         event: AiocqhttpMessageEvent,
-        target_id: int,
+        target_id: str,
         special_title: str,
         need_auth: bool = True,
     ):
         """
         给群聊中某用户设置专属头衔。
         Args:
-            target_id(number): 要设置头衔的用户的QQ
+            target_id(string): 要设置头衔的用户的QQ
             special_title(string): 要设置的新头衔
             need_auth(boolean): 兼容参数；无论取值如何，始终检查当前群用户权限
         """
@@ -1495,12 +1503,12 @@ class Main(
 
     @filter.llm_tool(name="llm_set_group_kick")
     async def admin_llm_set_group_kick(
-        self, event: AiocqhttpMessageEvent, target_id: int
+        self, event: AiocqhttpMessageEvent, target_id: str
     ):
         """
         将指定用户踢出当前群聊(危险操作，本工具已强制鉴权)。
         Args:
-            target_id(number): 要踢出的用户QQ。
+            target_id(string): 要踢出的用户QQ。
         """
         if error := (
             await perm_manager.llm_perm_block(
@@ -1516,12 +1524,12 @@ class Main(
 
     @filter.llm_tool(name="llm_set_group_block")
     async def admin_llm_set_group_block(
-        self, event: AiocqhttpMessageEvent, target_id: int
+        self, event: AiocqhttpMessageEvent, target_id: str
     ):
         """
         将指定用户踢出当前群聊并加入群黑名单(危险操作，本工具已强制鉴权)。
         Args:
-            target_id(number): 要踢出并拉黑的用户QQ。
+            target_id(string): 要踢出并拉黑的用户QQ。
         """
         if error := (
             await perm_manager.llm_perm_block(
@@ -1539,14 +1547,14 @@ class Main(
     async def admin_llm_set_essence_msg(
         self,
         event: AiocqhttpMessageEvent,
-        message_id: int,
+        message_id: str,
         enable: bool = True,
         need_auth: bool = True,
     ):
         """
         设置或取消指定消息的群精华。
         Args:
-            message_id(number): 要操作的消息ID。
+            message_id(string): 要操作的消息ID。
             enable(boolean): 是否设置为群精华，False表示取消群精华。
             need_auth(boolean): 兼容参数；无论取值如何，始终检查当前群用户权限。
         """

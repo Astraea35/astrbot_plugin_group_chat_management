@@ -1,18 +1,26 @@
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 
 from aiohttp import ClientSession
 
 from astrbot.api import logger
-from astrbot.core.message.components import At, BaseMessageComponent, Image, Reply
+from astrbot.core.message.components import BaseMessageComponent, Image, Reply
 from astrbot.core.platform.sources.aiocqhttp.aiocqhttp_message_event import (
     AiocqhttpMessageEvent,
 )
+from ..qq_official import is_official, mention_ids
 
 
 async def get_nickname(event: AiocqhttpMessageEvent, user_id: int | str) -> str:
     """获取指定群友的群昵称或 Q 名，群接口失败/空结果自动降级到陌生人资料"""
+    if is_official(event):
+        try:
+            info = await event.bot.get_group_member_info(group_id=event.get_group_id(), user_id=str(user_id))
+            return info.get("nickname") or str(user_id)
+        except Exception:
+            return str(user_id)
     user_id = int(user_id)
     client = event.bot
     group_id = event.get_group_id()
@@ -43,11 +51,14 @@ async def get_nickname(event: AiocqhttpMessageEvent, user_id: int | str) -> str:
 
 def get_ats(event: AiocqhttpMessageEvent) -> list[str]:
     """获取被at者们的id列表"""
-    return [
-        str(seg.qq)
-        for seg in event.get_messages()
-        if (isinstance(seg, At) and str(seg.qq) != event.get_self_id())
-    ]
+    targets = mention_ids(event)
+    if not targets and is_official(event):
+        for seg in event.get_messages() or []:
+            if isinstance(seg, Reply) and getattr(seg, "sender_id", None):
+                targets.append(str(seg.sender_id))
+        if not targets:
+            targets = [word for word in event.message_str.split()[1:] if re.fullmatch(r"[A-Za-z0-9_-]{16,128}", word) and not word.isdigit()]
+    return list(dict.fromkeys(targets))
 
 
 def get_replyer_id(event: AiocqhttpMessageEvent) -> str | None:

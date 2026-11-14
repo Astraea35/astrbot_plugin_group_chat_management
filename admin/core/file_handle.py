@@ -1,3 +1,4 @@
+from ...qq_official import action_id
 import os
 import re
 from datetime import datetime
@@ -30,7 +31,7 @@ class FileHandle:
         """
         path = path.strip()
         response = await event.bot.get_group_root_files(
-            group_id=int(event.get_group_id())
+            group_id=action_id(event, event.get_group_id())
         )
         _, mapping = self._get_folder_info(response, "")
 
@@ -60,7 +61,7 @@ class FileHandle:
                 target_folder = await self._get_folder(event, folder_name)
                 if target_folder:
                     folder_files = await event.bot.get_group_files_by_folder(
-                        group_id=int(event.get_group_id()),
+                        group_id=action_id(event, event.get_group_id()),
                         folder_id=target_folder["folder_id"],
                     )
                     _, file_mapping = self._get_folder_info(folder_files, "")
@@ -89,7 +90,7 @@ class FileHandle:
     ) -> dict | None:
         """从根目录下找到指定文件夹, 返回文件夹数据"""
         response = await event.bot.get_group_root_files(
-            group_id=int(event.get_group_id())
+            group_id=action_id(event, event.get_group_id())
         )
         return next(
             (
@@ -157,7 +158,7 @@ class FileHandle:
         if not target_folder:
             return None, None
         response = await event.bot.get_group_files_by_folder(
-            group_id=int(event.get_group_id()), folder_id=target_folder["folder_id"]
+            group_id=action_id(event, event.get_group_id()), folder_id=target_folder["folder_id"]
         )
         file = next((f for f in response["files"] if f["file_name"] == file_name), None)
         return target_folder, file
@@ -182,7 +183,7 @@ class FileHandle:
         """
         确保群文件夹存在，如果不存在则创建，返回目标文件夹数据
         """
-        group_id = int(event.get_group_id())
+        group_id = action_id(event, event.get_group_id())
         client = event.bot
 
         target_folder = await self._get_folder(event, folder_name)
@@ -205,7 +206,7 @@ class FileHandle:
         if not file_name:
             return "路径未包含文件名，无法上传"
 
-        group_id = int(event.get_group_id())
+        group_id = action_id(event, event.get_group_id())
         client = event.bot
 
         # 拼接本地缓存路径
@@ -235,7 +236,7 @@ class FileHandle:
         folder_name, file_name = await self._parse_path(event, path)
         if not folder_name and not file_name:
             return "请指定要删除的文件夹或文件"
-        group_id = int(event.get_group_id())
+        group_id = action_id(event, event.get_group_id())
 
         # 删除文件
         if file_name:
@@ -271,7 +272,7 @@ class FileHandle:
 
     async def view_group_file(self, event: AiocqhttpMessageEvent, path) -> str:
         """查看群文件/目录，path 可以是 文件夹名、文件名 或 文件夹名/文件名"""
-        group_id = int(event.get_group_id())
+        group_id = action_id(event, event.get_group_id())
         client = event.bot
         if not path:
             # 查看根目录

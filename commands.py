@@ -70,7 +70,7 @@ class CommandsMixin:
         try:
             # 调用 OneBot get_group_msg_history 拉取最近 100 条消息（大部分 OneBot 实现支持）
             # _safe_int 用于防止 group_id 字符串转换为 int 时抛出异常
-            result = await self._call_action_checked(client, 'get_group_msg_history', group_id=self._safe_int(group_id, 0), count=100)
+            result = await self._call_action_checked(client, 'get_group_msg_history', group_id=self._api_id(group_id, 0), count=100)
             # _extract_data_result: 统一处理 OneBot API 的 data 字段嵌套（如 {status:ok, data:{...}}）
             result = self._extract_data_result(result)
             messages = result.get('messages', []) if isinstance(result, dict) else []

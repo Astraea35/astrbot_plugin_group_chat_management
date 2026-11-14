@@ -6,7 +6,7 @@
 
 ## 安装
 
-要求 AstrBot >= 4.24.2，使用 OneBot / aiocqhttp 平台，机器人拥有目标群的管理员权限。
+要求 AstrBot >= 4.24.2，支持 OneBot / aiocqhttp、QQ 官方机器人（WebSocket / Webhook）。处罚操作需要机器人拥有目标群的管理员权限，并已获对应官方 API 权限。
 
 在 AstrBot 插件管理中使用仓库链接安装：
 
@@ -27,6 +27,19 @@ https://github.com/Astraea35/astrbot_plugin_group_chat_management
 - 整合 QQAdmin 的禁言、全禁、改名、头衔、踢人、拉黑、管理员、精华、撤回、公告、群文件、投票禁言、宵禁、欢迎与退群通知。原指令和秒数参数用法保留，例如 `/禁言 60 @用户`。
 - 同一插件提供分群权限与默认模板管理页面。`/批准`、`/驳回` 支持引用申请通知，完整保留带冒号的 OneBot 请求标识。
 - 已接管的 AI 入群申请不会再次交给传统审核；分群黑名单也纳入 AI 准入检查。LLM 管理工具始终检查权限，模型传入 `need_auth=false` 不能绕过鉴权。
+
+## QQ 官方机器人
+
+- 已适配命令权限、OpenID、结构化 @ 和 `<@OpenID>` 文本目标；官方群与用户 ID 全程保留字符串。不会把 QQ 号自动猜测成 OpenID，也不会把官方事件转交给另一台 OneBot 账号执行。
+- 支持官方单成员禁言、解除、消息撤回、禁言列表及入群审批 API；踢人和成员查询已接入官方接口，但能否使用取决于应用获得的接口权限。成员查询 11253 等错误不会当作“用户不在群”或已成功。
+- 自动内容审核和防刷屏也走官方禁言及撤回接口；防刷屏只在撤回成功时报告实际条数。只能审核平台实际投递的消息；如需全群审核，应在开放平台申请全量群消息接收能力。
+- 在插件管理员、AstrBot 管理员或分群超管中填写该应用实际收到的用户 OpenID；群范围和分群配置使用群 OpenID。数字 QQ 号与另一应用的 OpenID 不能互换。未获成员资料权限时，不自动授予未知用户管理权限；已明确配置的管理员仍可使用获授权的群管接口。
+- 当前 AstrBot/botpy 部分版本不分发官方入群事件，因此按既有 `auto_unban_scan_interval` 间隔（默认 60 秒）轮询已配置或已收到消息的官方群申请，并复用 AI / 关键词 / 转人工流程。支持分页和申请去重。多官方应用并存时，需先在对应群接收消息建立应用路由；后台不会猜测应使用哪个应用。
+- 官方接口没有真实 QQ 等级。设置了等级门槛时，自动通过会转人工，不能用群等级或猜测值代替真实等级。未满足条件不会自动放行。
+- 官方文档没有本插件所需的群名片修改、头衔、任免管理员、全体禁言、精华、群公告和管理群文件接口；这些命令会明确提示限制，OneBot 功能保留。官方成员资料缺少名片字段时不会当作“空名片”还原；也不按缺失的发言时间或等级批量清人。
+- 入群人工通知支持引用后 `/批准`、`/驳回`；应在同一官方群操作。官方引用消息 ID 必须为该应用可用的官方 ID，OneBot 消息序号不能替代。主动通知还受官方消息发送权限限制，发送失败不会标记为已通知。
+
+官方接口依据：[群管理文档](https://bot.q.qq.com/wiki/develop/api-v2/server-inter/group/manage/)。本版本的离线回归测试不代表所有真实处罚动作均已实群验收。
 
 ## 配置
 
@@ -53,7 +66,7 @@ https://github.com/Astraea35/astrbot_plugin_group_chat_management
 
 ```shell
 python -m pip install pytest pytest-asyncio pytest-subtests pillow qrcode numpy opencv-python-headless
-python -m pytest tests/test_membership_api_result.py tests/test_provider_streaming.py tests/test_group_review_policy.py tests/test_group_policy_revision.py tests/test_management_merge.py -q
+python -m pytest tests/test_membership_api_result.py tests/test_provider_streaming.py tests/test_group_review_policy.py tests/test_group_policy_revision.py tests/test_management_merge.py tests/test_qq_official_management.py -q
 ```
 
 测试使用虚构账号、群号和合成样例，不连接实际 QQ 账号，也不会执行真实处罚。`lexicon.db` 是与原项目一致的静态词库，不含实例审核记录。

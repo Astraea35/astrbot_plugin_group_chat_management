@@ -168,11 +168,13 @@ class AntiFloodMixin:
         return "", ""
 
     @classmethod
-    def _anti_flood_recallable_message_id(cls, value) -> str:
-        """Return only a real numeric message ID suitable for ``delete_msg``."""
+    def _anti_flood_recallable_message_id(cls, value, allow_opaque=False) -> str:
+        """Accept official opaque IDs only on an explicitly official event."""
         value = cls._anti_flood_message_id(value)
         if not value or value.casefold().startswith("seq:"):
             return ""
+        if allow_opaque and re.fullmatch(r"[A-Za-z0-9_.=-]+", value):
+            return value
         try:
             if int(value) <= 0:
                 return ""

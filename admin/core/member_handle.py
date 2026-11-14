@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from ...qq_official import action_id, is_official
+
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -24,7 +26,11 @@ class MemberHandle:
         """查看群友信息，人数太多时可能会处理失败"""
         await event.send(event.plain_result("获取中..."))
         group_id = event.get_group_id()
-        members_data = await event.bot.get_group_member_list(group_id=int(group_id))
+        members_data = await event.bot.get_group_member_list(group_id=action_id(event, group_id))
+        if is_official(event):
+            info = "\n".join(f"{m.get('nickname', '')}（{m['user_id']}） {m.get('role', 'unknown')}" for m in members_data)
+            await event.send(event.plain_result(info or "成员列表为空"))
+            return
         info_list = [
             (
                 f"{format_time(member['join_time'])}："
@@ -48,11 +54,14 @@ class MemberHandle:
         under_level: int = 10,
     ):
         """/清理群友 未发言天数 群等级"""
+        if is_official(event):
+            await event.send(event.plain_result("QQ官方平台不提供成员最后发言时间和真实QQ等级，无法按这些条件清理群友"))
+            return
         group_id = event.get_group_id()
         sender_id = event.get_sender_id()
 
         try:
-            members_data = await event.bot.get_group_member_list(group_id=int(group_id))
+            members_data = await event.bot.get_group_member_list(group_id=action_id(event, group_id))
         except Exception as e:
             await event.send(event.plain_result(f"获取群成员信息失败：{e}"))
             return
@@ -110,8 +119,8 @@ class MemberHandle:
                     target_name = await get_nickname(event, user_id=clear_id)
                     try:
                         await event.bot.set_group_kick(
-                            group_id=int(group_id),
-                            user_id=int(clear_id),
+                            group_id=action_id(event, group_id),
+                            user_id=action_id(event, clear_id),
                             reject_add_request=False,
                         )
                         msg_list.append(f"✅ 已将 {target_name}({clear_id}) 踢出本群")

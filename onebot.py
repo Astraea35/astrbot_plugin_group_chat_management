@@ -8,6 +8,8 @@ from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent
 from astrbot.core.platform.sources.aiocqhttp.aiocqhttp_message_event import AiocqhttpMessageEvent
 
+from .qq_official import OfficialClient, is_official
+
 try:
     from .single_flight import shared_task, wait_shared
 except ImportError:  # 独立加载 onebot.py 的单元测试兼容路径
@@ -25,6 +27,21 @@ class OneBotMixin:
         # 三级回退：优先从 event.bot 取，其次用缓存的 self._client，最后遍历 platform_manager 查找可用实例。
         # AstrBot 文档里的 aiocqhttp client 调用形态是 client.api.call_action()；旧版本/部分适配器
         # 也可能直接暴露 client.call_action()。这里统一归一化为"可直接 call_action 的对象"。
+        if event and is_official(event):
+            bot = getattr(event, 'bot', None)
+            if isinstance(bot, OfficialClient):
+                return bot
+            if bot is None or not getattr(getattr(bot, 'api', None), '_http', None):
+                return None
+            gid = self._get_group_id(event)
+            clients = getattr(self, '_official_clients', None)
+            if clients is None:
+                clients = self._official_clients = {}
+            key = (id(bot), gid)
+            if key not in clients:
+                clients[key] = OfficialClient(bot, gid, event.get_self_id(), event)
+            clients[key].event = event
+            return clients[key]
         if event:
             client = self._normalize_action_client(getattr(event, 'bot', None))
             if client:
@@ -57,6 +74,45 @@ class OneBotMixin:
         except Exception as e:
             logger.debug(f"[GroupMgr] 从 platform_manager 获取 client 失败: {e}")
         return None
+
+    async def _client_for_group(self, group_id, event=None):
+        """Route background actions to the matching official group or OneBot."""
+        if event is not None:
+            return await self._get_client(event)
+        gid = str(group_id)
+        if gid.isdigit():
+            return await self._get_client()
+        clients = [c for (_, group), c in getattr(self, '_official_clients', {}).items() if group == gid]
+        if len(clients) == 1:
+            return clients[0]
+        if not clients:
+            platforms = self.context.platform_manager.get_insts()
+            official = [p for p in platforms if p.meta().name in {"qq_official", "qq_official_webhook"}]
+            # A fresh process has no observed routes. Never guess between apps.
+            if len(official) == 1:
+                bot = official[0].get_client()
+                if inspect.isawaitable(bot):
+                    bot = await bot
+                client = OfficialClient(bot, gid, "qq_official")
+                if not hasattr(self, '_official_clients'):
+                    self._official_clients = {}
+                self._official_clients[id(bot), gid] = client
+                return client
+        return None
+
+    def _api_id(self, value, default=0):
+        """Retain opaque OpenIDs while preserving OneBot's numeric parameters."""
+        text = str(value or '').strip()
+        if text and not text.isdigit():
+            import re
+
+            return text if re.fullmatch(r'[A-Za-z0-9_.=-]+', text) else default
+        return self._safe_int(value, default)
+
+    async def _poll_official_requests(self):
+        from .qq_official import poll_requests
+
+        await poll_requests(self)
 
     @staticmethod
     def _normalize_action_client(candidate):
@@ -172,6 +228,8 @@ class OneBotMixin:
         # ② 全局管理员名单
         if user_id in self._get_all_admin_ids():
             return True
+        if is_official(event) and getattr(event, 'is_admin', lambda: False)():
+            return True
 
         if not group_id:
             return False
@@ -243,7 +301,7 @@ class OneBotMixin:
             if client:
                 ok, info, error = await self._call_group_api_result(
                     client, 'get_group_member_info', '获取群成员信息',
-                    group_id=self._safe_int(group_id, 0), user_id=self._safe_int(user_id, 0),
+                    group_id=self._api_id(group_id, 0), user_id=self._api_id(user_id, 0),
                     no_cache=False,
                 )
                 if ok and isinstance(info, dict):
@@ -281,7 +339,7 @@ class OneBotMixin:
         cached = self._admin_role_cache.get(cache_key)
         if cached and now - cached[1] < self._admin_role_cache_ttl:
             return cached[0]
-        if not self._safe_int(group_id, 0) or not self._safe_int(user_id, 0):
+        if not self._api_id(group_id, 0) or not self._api_id(user_id, 0):
             return ""
         stale = cached[0] if cached and now - cached[1] < self.MEMBER_ROLE_STALE_MAX else None
         fails = getattr(self, "_member_role_fail", None)
@@ -343,8 +401,8 @@ class OneBotMixin:
 
     async def _get_role_by_id(self, client, group_id, user_id) -> str:
         """直接用 client 查某成员在群里的角色（member/admin/owner），无 event 版本。失败返回 ''。"""
-        gid = self._safe_int(group_id, 0)
-        uid = self._safe_int(user_id, 0)
+        gid = self._api_id(group_id, 0)
+        uid = self._api_id(user_id, 0)
         if not gid or not uid or not client:
             return ""
         try:
@@ -376,7 +434,12 @@ class OneBotMixin:
         try:
             client = await self._get_client(event)
             if client:
-                uin = await self._get_bot_uin(client)
+                if isinstance(client, OfficialClient):
+                    state = await client.bot_state(gid)
+                    role = state.get("member_role", "")
+                    uin = ""
+                else:
+                    uin = await self._get_bot_uin(client)
                 if uin:
                     role = await self._get_role_by_id(client, gid, uin)
         except Exception as e:
@@ -471,6 +534,11 @@ class OneBotMixin:
         # 仅这些操作需要目标角色保护
         if action not in ("ban", "kick", "set_card", "set_title", "set_admin", "unset_admin"):
             return True, ""
+        if isinstance(client, OfficialClient):
+            state = await client.bot_state(group_id)
+            if state.get("member_role") not in ("admin", "owner"):
+                return False, "机器人在该群不是管理员，无法执行群管操作"
+            return True, ""
         bot_uin = await self._get_bot_uin(client)
         bot_role = await self._get_role_by_id(client, group_id, bot_uin) if bot_uin else ""
         if bot_role not in ("admin", "owner"):
@@ -545,22 +613,16 @@ class OneBotMixin:
         return ""
 
     def _onebot_unsupported_message(self, event: AstrMessageEvent) -> str:
-        """Issue #92：事件来自不提供 OneBot 接口的平台（如 QQ 官方机器人）时返回说明，否则返回空串。
-
-        群管操作全部依赖 OneBot 动作（set_group_ban / set_group_whole_ban 等），
-        QQ 官方机器人接口既不提供这些动作，也拿不到群主/管理员身份，旧行为只会给出
-        「仅管理员可以使用此功能」或「无法获取QQ客户端」，让人误以为是名单配置问题。
-        取不到平台名、或事件自带可 call_action 的客户端时一律放行，不影响 OneBot 及自定义适配器。
-        """
+        """Reject unrelated platforms; QQ official actions use their own API client."""
         platform = self._event_platform_name(event)
-        if not platform or platform == "aiocqhttp":
+        if not platform or platform in {"aiocqhttp", "qq_official", "qq_official_webhook"}:
             return ""
         if self._normalize_action_client(getattr(event, "bot", None)):
             return ""
         return (
             f"当前平台（{platform}）不支持此功能：禁言、踢人、全体禁言、群公告等群管操作依赖 OneBot 协议接口，"
             "需通过 aiocqhttp 适配器接入 NapCat / Lagrange 等协议端使用。"
-            "QQ 官方机器人接口不提供这些群管理能力，也无法识别群主/管理员身份。"
+            "请使用已适配的QQ官方机器人或OneBot平台。"
         )
 
     def _admin_denied_message(self, event: AstrMessageEvent, base: str) -> str:
@@ -618,7 +680,7 @@ class OneBotMixin:
         _, client, gid, err = await self._get_group_client(event, need_gid=True)
         if not client:
             return False, err, None, 0, 0
-        uid = self._safe_int(user_id, 0)
+        uid = self._api_id(user_id, 0)
         if not uid:
             return False, "用户QQ号格式无效", None, 0, 0
         if precheck_action:
@@ -662,7 +724,7 @@ class OneBotMixin:
         )
         if not ok:
             return False, err, None, 0
-        mid = self._safe_int(message_id, 0)
+        mid = self._api_id(message_id, 0)
         if not mid:
             return False, "消息ID格式无效", None, 0
         return True, "", client, mid
@@ -676,7 +738,7 @@ class OneBotMixin:
         if not client:
             return (None, None, None, "无法获取QQ客户端") if need_gid else (None, None, "无法获取QQ客户端")
         if need_gid:
-            gid = self._safe_int(group_id, 0)
+            gid = self._api_id(group_id, 0)
             if not gid:
                 return None, None, None, "群号格式无效"
             return group_id, client, gid, ""
@@ -735,7 +797,7 @@ class OneBotMixin:
         审核路径随后照样在群里宣布「消息已被撤回」。现经 _call_group_api 统一校验
         status/retcode 与异常，调用方可据此决定是否发提示、日志如何记录。
         """
-        mid = self._safe_int(msg_id)
+        mid = self._api_id(msg_id, 0)
         if not mid:
             return None
         client = await self._get_client(event)
@@ -765,7 +827,7 @@ class OneBotMixin:
 
         注意：OneBot delete_msg 只能撤回约 2 分钟内的消息，超时的会静默失败。
         """
-        gid = self._safe_int(group_id, 0)
+        gid = self._api_id(group_id, 0)
         if not gid or not user_id or count <= 0:
             return 0
         recalled = 0
@@ -803,8 +865,8 @@ class OneBotMixin:
         client = await self._get_client(event)
         if not client:
             return False
-        gid = self._safe_int(group_id, 0)
-        uid = self._safe_int(user_id, 0)
+        gid = self._api_id(group_id, 0)
+        uid = self._api_id(user_id, 0)
         if not gid or not uid:
             return False
         try:
@@ -835,8 +897,8 @@ class OneBotMixin:
         client = await self._get_client(event)
         if not client:
             return False
-        gid = self._safe_int(group_id, 0)
-        uid = self._safe_int(user_id, 0)
+        gid = self._api_id(group_id, 0)
+        uid = self._api_id(user_id, 0)
         if not gid or not uid:
             return False
         ban_duration = duration if duration is not None else self._cfg_int("moderation_ban_duration", 1800, group_id=group_id)
@@ -859,11 +921,11 @@ class OneBotMixin:
 
     async def _unban_member(self, group_id, user_id, event: AstrMessageEvent = None) -> bool:
         # 解除某群成员禁言（set_group_ban duration=0）。用于定时解禁、申诉通过等场景。
-        gid = self._safe_int(group_id, 0)
-        uid = self._safe_int(user_id, 0)
+        gid = self._api_id(group_id, 0)
+        uid = self._api_id(user_id, 0)
         if not gid or not uid:
             return False
-        client = await self._get_client(event)
+        client = await self._client_for_group(group_id, event)
         if not client:
             return False
         try:

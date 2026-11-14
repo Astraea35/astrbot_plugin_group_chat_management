@@ -263,12 +263,11 @@ class PenaltyNoticeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(notices), 1)
         self.assertEqual(harness.logs[0][4], "LLM撤回")
 
-    async def test_llm_penalty_treats_unknown_recall_result_as_success(self):
-        # 旧测试桩与未返回结果的调用方返回 None，保持原行为
+    async def test_llm_penalty_does_not_announce_unknown_recall_result(self):
         harness = _PenaltyHarness(recall_result=None)
         notices = await _drain(harness._execute_llm_penalty(
             _Event(), "1", "2", "tester", "text", "广告", "ad", [], []))
-        self.assertEqual(len(notices), 1)
+        self.assertEqual(notices, [])
 
     async def test_rule_penalty_logs_failed_recall_without_recall_word(self):
         harness = _PenaltyHarness(recall_result=False, mute_ok=False)

@@ -487,15 +487,18 @@ class ModerationMixin(ImageAuditMixin, ModerationContextMixin):
                 else:
                     self._clear_anti_flood_penalty(group_id, user_id)
             flood_total = flood_info.get("total_msgs", flood_info.get("count", 0))
+            official = getattr(event, "get_platform_name", lambda: "")() in {"qq_official", "qq_official_webhook"}
             recall_ids = [
-                self._anti_flood_recallable_message_id(fid)
+                self._anti_flood_recallable_message_id(fid, allow_opaque=official)
                 for fid in (flood_info.get("msg_ids") or [])
             ]
             recall_ids = [fid for fid in recall_ids if fid]
+            recalled_count = 0
             if recall_enabled and flood_total >= recall_threshold and recall_ids:
                 for fid in recall_ids:
                     try:
-                        await self._recall_msg(event, fid)
+                        if await self._recall_msg(event, fid) is True:
+                            recalled_count += 1
                     except Exception:
                         pass
             if mute_dur > 0 and mute_succeeded:
@@ -510,8 +513,8 @@ class ModerationMixin(ImageAuditMixin, ModerationContextMixin):
                     f"（{flood_info['rate']} {flood_info['count']} 条/上限 {flood_info['limit']} 条）"
                 )
                 action = "刷屏处理" if mute_dur <= 0 else "禁言失败"
-            if recall_enabled and flood_total >= recall_threshold:
-                notice += "，消息已撤回"
+            if recalled_count:
+                notice += f"，已撤回{recalled_count}条消息"
             self._log_moderation(group_id, user_id, user_name,
                                  f"[刷屏] {flood_info['rate']} {flood_info['count']}条/上限{flood_info['limit']}条",
                                  action, notice, [])
@@ -2360,8 +2363,8 @@ class ModerationMixin(ImageAuditMixin, ModerationContextMixin):
         返回 ("ok", 值) 表示协议端明确上报；("absent", False) 表示查询成功但协议端
         不提供该字段；("error", False) 表示查询失败。
         """
-        gid = self._safe_int(group_id, 0)
-        uid = self._safe_int(user_id, 0)
+        gid = self._api_id(group_id, 0)
+        uid = self._api_id(user_id, 0)
         if not gid or not uid:
             return "error", False
         try:
@@ -2813,7 +2816,7 @@ class ModerationMixin(ImageAuditMixin, ModerationContextMixin):
         target = self._cfg_str(
             "moderation_notify_admin_id", "", group_id=group_id
         ).strip()
-        if not target.isdigit():
+        if not self._api_id(target):
             logger.warning("[GroupMgr] Moderation alert recipient is invalid")
             return False
         client = await self._get_client(event)
@@ -2836,7 +2839,7 @@ class ModerationMixin(ImageAuditMixin, ModerationContextMixin):
             client,
             "send_private_msg",
             "发送群管私聊提醒",
-            user_id=int(target),
+            user_id=self._api_id(target),
             message=message,
             auto_escape=True,
         )
@@ -2860,7 +2863,7 @@ class ModerationMixin(ImageAuditMixin, ModerationContextMixin):
             client,
             "send_group_msg",
             "发送群管@提醒",
-            group_id=int(group_id),
+            group_id=self._api_id(group_id),
             message=fallback,
         )
         if not ok:
